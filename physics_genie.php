@@ -14,7 +14,7 @@ class Physics_Genie {
 
   public function __construct() {
 
-    add_action('init', array($this, 'connect_another_db'));
+    // add_action('init', array($this, 'connect_another_db'));
 
     // Registers API routes
     add_action('rest_api_init', function(){
@@ -160,10 +160,10 @@ class Physics_Genie {
     });
   }
 
-  public static function connect_another_db() {
-    global $seconddb;
-    $seconddb = new wpdb("physicsgenius", "Morin137!", "wordpress", "restored-instance-7-12-21.c4npn2kwj61c.us-west-1.rds.amazonaws.com");
-  }
+  // public static function connect_another_db() {
+  //  global $seconddb;
+  //  $seconddb = new wpdb("physicsgenius", "Morin137!", "wordpress", "restored-instance-7-12-21.c4npn2kwj61c.us-west-1.rds.amazonaws.com");
+  // }
 
 
   public function deploy_backend() {
