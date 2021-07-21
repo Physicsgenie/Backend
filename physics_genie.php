@@ -8,7 +8,8 @@ function add_cors_http_header(){
 }
 add_action('init','add_cors_http_header');
 
-$DEBUG = True; // Switches databases to staging ones, disable when pushing to productoin
+// Reads the debug config from config.php
+require_once('config.php');
 
 // Parses db names to add staging if debug is set
 function getTable($tab) {
