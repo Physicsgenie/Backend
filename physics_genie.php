@@ -21,13 +21,13 @@ class Physics_Genie {
       // Registers the path /physics_genie/git-deploy-backend to update the plugin
       register_rest_route( 'physics_genie', '/git-deploy-backend', array(
         'methods'  => 'POST',
-        'callback' => array($this, 'deploy-backend'),
+        'callback' => array($this, 'deploy_backend'),
       ));
 
       // Registers the path /physics_genie/git-deploy-frontend to update the webapp
       register_rest_route( 'physics_genie', '/git-deploy-frontend', array(
         'methods'  => 'POST',
-        'callback' => array($this, 'deploy-frontend'),
+        'callback' => array($this, 'deploy_frontend'),
       ));
 
       /* GET REQUESTS */
