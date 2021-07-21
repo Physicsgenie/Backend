@@ -8,6 +8,7 @@ function add_cors_http_header(){
 }
 add_action('init','add_cors_http_header');
 
+$DEBUG = True; // Switches databases to staging ones, disable when pushing to productoin
 
 class Physics_Genie {
 
@@ -165,6 +166,10 @@ class Physics_Genie {
   //  $seconddb = new wpdb("physicsgenius", "Morin137!", "wordpress", "restored-instance-7-12-21.c4npn2kwj61c.us-west-1.rds.amazonaws.com");
   // }
 
+  public static function getDB($db) {
+    
+  }
+
 
   public function deploy_backend() {
     require_once('deploy-backend.php');
@@ -231,7 +236,22 @@ class Physics_Genie {
   public function get_user_stats($request_data) {
     global $wpdb;
 
-    $stats = $wpdb->get_results("SELECT topic, focus, num_presented, num_correct, avg_attempts, xp, streak, longest_winstreak, longest_losestreak FROM wordpress.pg_user_stats WHERE user_id = ".get_current_user_id()." AND ".(isset($request_data['topic']) ? 'topic = "'.$request_data['topic'].'"' : 'true')." AND ".(isset($request_data['focus']) ? 'focus = "'.$request_data['focus'].'"' : 'true')." ORDER BY topic, focus;", OBJECT);
+    $stats = $wpdb->get_results(
+      "SELECT
+        topic,
+        focus,
+        num_presented,
+        num_correct,
+        avg_attempts,
+        xp,
+        streak,
+        longest_winstreak,
+        longest_losestreak
+        FROM wordpress.pg_user_stats
+        WHERE user_id = ".get_current_user_id()."
+          AND ".(isset($request_data['topic']) ? 'topic = "'.$request_data['topic'].'"' : 'true')."
+          AND ".(isset($request_data['focus']) ? 'focus = "'.$request_data['focus'].'"' : 'true')."
+      ORDER BY topic, focus;", OBJECT);
 
     return $stats;
   }
@@ -241,7 +261,38 @@ class Physics_Genie {
 
     if ($wpdb->get_results("SELECT curr_problem FROM pg_users WHERE user_id = ".get_current_user_id().";", OBJECT)[0]->curr_problem === null) {
 
-      $problem = $wpdb->get_results("SELECT * FROM wordpress.pg_problems WHERE (SELECT curr_topics FROM wordpress.pg_users WHERE user_id = 1) LIKE CONCAT('%', topic, '%') AND (SELECT curr_foci FROM wordpress.pg_users WHERE user_id = ".get_current_user_id().") LIKE CONCAT('%', main_focus, '%') AND difficulty > (SELECT curr_diff FROM wordpress.pg_users WHERE user_id = 1) AND difficulty <= (SELECT curr_diff FROM wordpress.pg_users WHERE user_id = ".get_current_user_id().") + IF((SELECT curr_diff FROM wordpress.pg_users WHERE user_id = ".get_current_user_id().") = 2, 3, 2) AND IF((SELECT calculus FROM wordpress.pg_users WHERE user_id = ".get_current_user_id()."), true, calculus != 'Required') AND problem_id NOT IN (SELECT problem_id FROM wordpress.pg_user_problems WHERE user_id = ".get_current_user_id().") ORDER BY RAND() LIMIT 1;", OBJECT);
+      $problem = $wpdb->get_results(
+        "SELECT *
+        FROM wordpress.pg_problems
+        WHERE
+            (SELECT curr_topics
+             FROM wordpress.pg_users
+             WHERE user_id = 1) LIKE CONCAT('%', topic, '%')
+          AND
+            (SELECT curr_foci
+             FROM wordpress.pg_users
+             WHERE user_id = ".get_current_user_id().") LIKE CONCAT('%', main_focus, '%')
+          AND difficulty >
+            (SELECT curr_diff
+             FROM wordpress.pg_users
+             WHERE user_id = 1)
+          AND difficulty <=
+            (SELECT curr_diff
+             FROM wordpress.pg_users
+             WHERE user_id = ".get_current_user_id().") + IF(
+                (SELECT curr_diff
+                FROM wordpress.pg_users
+                WHERE user_id = ".get_current_user_id().") = 2, 3, 2)
+          AND IF(
+                   (SELECT calculus
+                    FROM wordpress.pg_users
+                    WHERE user_id = ".get_current_user_id()."), TRUE, calculus != 'Required')
+          AND problem_id NOT IN
+            (SELECT problem_id
+             FROM wordpress.pg_user_problems
+             WHERE user_id = ".get_current_user_id().")
+        ORDER BY RAND()
+        LIMIT 1;", OBJECT);
 
       if (count($problem) == 0) {
         return null;
