@@ -15,8 +15,8 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  # This workflow contains a single job called "deploy"
+  deploy:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -25,12 +25,8 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo hello there,
-
       # Deploys changes via webhook
-      - name: Workflow Webhook Action
+      - name: Deploy changes via webhook
         # You may pin to the exact commit or the version.
         # uses: distributhor/workflow-webhook@6edfd7cdaf8e0551b717bab8912c8d910475b98f
         uses: distributhor/workflow-webhook@v2.0.2
