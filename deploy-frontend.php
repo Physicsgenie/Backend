@@ -1,6 +1,6 @@
 <?php
 
-require('credentials.php'); // No peeking
+require('config.php'); // No peeking
 
 define('TOKEN', $TOKEN); // Secrets
 
