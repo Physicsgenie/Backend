@@ -65,7 +65,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-metadata', array(
         'methods' => 'GET',
         'callback' => function() {
-          $data = null;
+          $data = (object)[];
 
           $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
 
@@ -107,7 +107,7 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
 
-          if ($wpdb->get_results("SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";", OBJECT)[0]->curr_problem === null) {
+          if ($wpdb->get_results("SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";")[0]->curr_problem === null) {
 
             $problem = $wpdb->get_results(
               "SELECT *
@@ -140,7 +140,7 @@ class Physics_Genie {
              FROM wordpress.".getTable('pg_user_problems')."
              WHERE user_id = ".get_current_user_id().")
         ORDER BY RAND()
-        LIMIT 1;", OBJECT);
+        LIMIT 1;");
 
             if (count($problem) == 0) {
               return null;
@@ -163,7 +163,7 @@ class Physics_Genie {
             }
 
           } else {
-            return $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE problem_id = (SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id  = ".get_current_user_id().");", OBJECT)[0];
+            return $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE problem_id = (SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id  = ".get_current_user_id().");")[0];
           }
         }
       ));
@@ -200,7 +200,7 @@ class Physics_Genie {
         'callback' => function($data) {
           global $wpdb;
 
-          $problem = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE ".getTable('pg_problems').".problem_id = ".$data['problem'].";", OBJECT)[0];
+          $problem = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE ".getTable('pg_problems').".problem_id = ".$data['problem'].";")[0];
 
           return $problem;
         }
@@ -248,7 +248,7 @@ class Physics_Genie {
         'methods' => 'GET',
         'callback' => function() {
           global $wpdb;
-          $data = null;
+          $data = (object)[];
           $data->topics = $wpdb->get_results("SELECT topic, name FROM ".getTable('pg_topics')." WHERE focus = 'z';");
           $data->focuses = $wpdb->get_results("SELECT topic, focus, name FROM ".getTable('pg_topics')." WHERE topic = 0 AND focus != 'z';");
           $data->source_categories = $wpdb->get_results("SELECT DISTINCT category FROM ".getTable('pg_sources')." ORDER BY category;");
@@ -277,9 +277,9 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
 
-          $data = null;
+          $data = (object)[];
 
-          $data->setup = $wpdb->get_results("SELECT curr_diff, curr_topics, curr_foci, calculus FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";", OBJECT)[0];
+          $data->setup = $wpdb->get_results("SELECT curr_diff, curr_topics, curr_foci, calculus FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";")[0];
 
 
           return $data;
@@ -311,6 +311,7 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
 
+
           $stats = $wpdb->get_results(
             "SELECT
         topic,
@@ -326,7 +327,7 @@ class Physics_Genie {
         WHERE user_id = ".get_current_user_id()."
           AND ".(isset($request_data['topic']) ? 'topic = "'.$request_data['topic'].'"' : 'true')."
           AND ".(isset($request_data['focus']) ? 'focus = "'.$request_data['focus'].'"' : 'true')."
-      ORDER BY topic, focus;", OBJECT);
+      ORDER BY topic, focus;");
 
           return $stats;
         }
@@ -395,7 +396,7 @@ class Physics_Genie {
             )
           );
 
-          foreach ($wpdb->get_results("SELECT topic, focus FROM ".getTable('pg_topics').";", OBJECT) as $focus) {
+          foreach ($wpdb->get_results("SELECT topic, focus FROM ".getTable('pg_topics').";") as $focus) {
             $wpdb->insert(
               getTable('pg_user_stats'),
               array(
@@ -447,6 +448,7 @@ class Physics_Genie {
           $message .= network_site_url("wp-login.php?action=rp&key=$key&login=" . rawurlencode($user_login), 'login');
 
           return wp_mail($user_email, "[Physics Genie] Password Reset", $message);
+
         }
       ));
 
@@ -622,7 +624,7 @@ class Physics_Genie {
           );
 
           //Focus stats
-          $curr_focus_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = '".$request_data['focus']."';", OBJECT)[0];
+          $curr_focus_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = '".$request_data['focus']."';")[0];
 
           $focus_xp = $curr_focus_stats->xp;
           $focus_streak = $curr_focus_stats->streak;
@@ -655,7 +657,7 @@ class Physics_Genie {
           );
 
           //Topic stats
-          $curr_topic_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = 'z';", OBJECT)[0];
+          $curr_topic_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = 'z';")[0];
 
           $wpdb->update(
             getTable('pg_user_stats'),
@@ -678,7 +680,7 @@ class Physics_Genie {
           );
 
           //User stats
-          $curr_user_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = 'z' AND focus = 'z';", OBJECT)[0];
+          $curr_user_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = 'z' AND focus = 'z';")[0];
 
           $wpdb->update(
             getTable('pg_user_stats'),
@@ -891,7 +893,7 @@ class Physics_Genie {
 
   // Method: POST, PUT, GET etc
   // Data: array("param" => "value") ==> index.php?param=value
-  public function CallAPI($method, $url, $data = false)
+  public function CallAPI($method, $url, $data)
   {
     $curl = curl_init();
 
@@ -907,7 +909,7 @@ class Physics_Genie {
         curl_setopt($curl, CURLOPT_PUT, 1);
         break;
       default:
-        if ($data)
+        if (isset($data))
           $url = sprintf("%s?%s", $url, http_build_query($data));
     }
 
