@@ -41,11 +41,37 @@ class Physics_Genie {
         'callback' => array($this, 'deploy_frontend'),
       ));
 
+      register_rest_route('physics_genie', 'user-metadata', array(
+        'methods' => 'GET',
+        'callback' => function() {
+          $data = (object)[];
+
+          $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
+
+          return $data;
+        }
+      ));
+
       // Test functions endpoint
       if($GLOBALS['DEBUG']){
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
-          'callback' => array($this, 'test')
+          'callback' => function($data) {
+
+            global $wpdb;
+            $wpdb->insert(
+              getTable('pg_topics'),
+              array(
+              'name' => serialize(
+                array(
+                  9,
+                  10,
+                )
+              )
+              )
+            );
+
+          }
         ));
       }
 
@@ -308,7 +334,8 @@ class Physics_Genie {
        */
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
-        'callback' => function() {
+        'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
 
 
@@ -325,8 +352,8 @@ class Physics_Genie {
         longest_losestreak
         FROM wordpress.".getTable('pg_user_stats')."
         WHERE user_id = ".get_current_user_id()."
-          AND ".(isset($request_data['topic']) ? 'topic = "'.$request_data['topic'].'"' : 'true')."
-          AND ".(isset($request_data['focus']) ? 'focus = "'.$request_data['focus'].'"' : 'true')."
+          AND ".(isset($json['topic']) ? 'topic = "'.$json['topic'].'"' : 'true')."
+          AND ".(isset($json['focus']) ? 'focus = "'.$json['focus'].'"' : 'true')."
       ORDER BY topic, focus;");
 
           return $stats;
@@ -352,10 +379,11 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'register', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           $user_data = array(
-            'user_login'    => $request_data["username"],
-            'user_email'    => $request_data["email"],
-            'user_pass'     => $request_data["password"],
+            'user_login'    => $json["username"],
+            'user_email'    => $json["email"],
+            'user_pass'     => $json["password"],
             'first_name'    => "",
             'last_name'     => "",
             'nickname'      => "",
@@ -374,7 +402,12 @@ class Physics_Genie {
               'user_id' => $user_id,
               'curr_diff' => 1,
               'curr_topics' => "0",
-              'curr_foci' => "78",
+              'curr_foci' => serialize(
+                array(
+                  9,
+                  10,
+                )
+              ),
               'calculus' => 1,
             )
           );
@@ -433,7 +466,8 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'password-reset', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $user_data = get_user_by('email', $request_data["email"]);
+          $json = json_decode($request_data);
+          $user_data = get_user_by('email', $json["email"]);
 
           $user_login = $user_data->user_login;
           $user_email = $user_data->user_email;
@@ -471,15 +505,16 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'report-problem-error', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
           $wpdb->insert(
             getTable('pg_problem_errors'),
             array(
               'user_id' => get_current_user_id(),
-              'problem_id' => $request_data['problem_id'],
-              'error_location' => ($request_data['error_location'] === "" ? null : $request_data['error_location']),
-              'error_type' => ($request_data['error_type'] === "" ? null : $request_data['error_type']),
-              'error_message' => ($request_data['error_message'] === "" ? null : $request_data['error_message']),
+              'problem_id' => $json['problem_id'],
+              'error_location' => ($json['error_location'] === "" ? null : $json['error_location']),
+              'error_type' => ($json['error_type'] === "" ? null : $json['error_type']),
+              'error_message' => ($json['error_message'] === "" ? null : $json['error_message']),
             )
           );
 
@@ -518,27 +553,29 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'submit-problem', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
+
           global $wpdb;
           $wpdb->insert(
             getTable('pg_problems'),
             array(
-              'problem_text' => $request_data['problem_text'],
-              'diagram' => ($request_data['diagram'] === "" ? null : $request_data['diagram']),
-              'answer' => $request_data['answer'],
-              'must_match' => ($request_data['must_match'] === 'true' ? 1 : 0),
-              'error' => floatval($request_data['error']),
-              'solution' => $request_data['solution'],
-              'solution_diagram' => ($request_data['solution_diagram'] === "" ? null : $request_data['solution_diagram']),
-              'hint_one' => $request_data['hint_one'],
-              'hint_two' => ($request_data['hint_two'] === "" ? null : $request_data['hint_two']),
-              'source' => intval($request_data['source']),
-              'number_in_source' => $request_data['number_in_source'],
+              'problem_text' => $json['problem_text'],
+              'diagram' => ($json['diagram'] === "" ? null : $json['diagram']),
+              'answer' => $json['answer'],
+              'must_match' => ($json['must_match'] === 'true' ? 1 : 0),
+              'error' => floatval($json['error']),
+              'solution' => $json['solution'],
+              'solution_diagram' => ($json['solution_diagram'] === "" ? null : $json['solution_diagram']),
+              'hint_one' => $json['hint_one'],
+              'hint_two' => ($json['hint_two'] === "" ? null : $json['hint_two']),
+              'source' => intval($json['source']),
+              'number_in_source' => $json['number_in_source'],
               'submitter' => get_current_user_id(),
-              'difficulty' => intval($request_data['difficulty']),
-              'calculus' => $request_data['calculus'],
-              'topic' => $request_data['topic'],
-              'main_focus' => $request_data['main_focus'],
-              'other_foci' => ($request_data['other_foci'] === "" ? null: $request_data['other_foci']),
+              'difficulty' => intval($json['difficulty']),
+              'calculus' => $json['calculus'],
+              'topic' => $json['topic'],
+              'main_focus' => $json['main_focus'],
+              'other_foci' => ($json['other_foci'] === "" ? null: $json['other_foci']),
               'date_added' => date('Y-m-d')
             )
           );
@@ -563,13 +600,15 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'add-source', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
+
           global $wpdb;
 
           $wpdb->insert(getTable('pg_sources'),
             array(
-              'category' => $request_data['category'],
-              'author' => $request_data['author'],
-              'source' => $request_data['source']
+              'category' => $json['category'],
+              'author' => $json['author'],
+              'source' => $json['source']
             )
           );
 
@@ -596,6 +635,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'submit-attempt', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
 
 
@@ -603,9 +643,9 @@ class Physics_Genie {
             getTable('pg_user_problems'),
             array(
               'user_id' => get_current_user_id(),
-              'problem_id' => intval($request_data['problem_id']),
-              'num_attempts' => intval($request_data['num_attempts']),
-              'correct' => ($request_data['correct'] === 'true' ? true : false),
+              'problem_id' => intval($json['problem_id']),
+              'num_attempts' => intval($json['num_attempts']),
+              'correct' => ($json['correct'] === 'true' ? true : false),
               'saved' => false,
               'date_attempted' => date('Y-m-d H:i:s')
             )
@@ -624,15 +664,15 @@ class Physics_Genie {
           );
 
           //Focus stats
-          $curr_focus_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = '".$request_data['focus']."';")[0];
+          $curr_focus_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$json['topic']."' AND focus = '".$json['focus']."';")[0];
 
           $focus_xp = $curr_focus_stats->xp;
           $focus_streak = $curr_focus_stats->streak;
-          if ($request_data['correct'] === 'true' && $focus_streak > 0 && ($focus_streak + 1) % 5 === 0) {
-            $focus_xp = intval(1.15*($curr_focus_stats->xp+intval($request_data['difficulty'])*(4-intval($request_data['num_attempts']))));
-          } else if ($request_data['correct'] === 'true') {
-            $focus_xp = $curr_focus_stats->xp+intval($request_data['difficulty'])*(4-intval($request_data['num_attempts']));
-          } else if (!($request_data['correct'] === 'true') && $focus_streak < 0 && ($focus_streak - 1) % 3 === 0) {
+          if ($json['correct'] === 'true' && $focus_streak > 0 && ($focus_streak + 1) % 5 === 0) {
+            $focus_xp = intval(1.15*($curr_focus_stats->xp+intval($json['difficulty'])*(4-intval($json['num_attempts']))));
+          } else if ($json['correct'] === 'true') {
+            $focus_xp = $curr_focus_stats->xp+intval($json['difficulty'])*(4-intval($json['num_attempts']));
+          } else if (!($json['correct'] === 'true') && $focus_streak < 0 && ($focus_streak - 1) % 3 === 0) {
             $focus_xp = intval(0.85*$curr_focus_stats->xp);
           }
 
@@ -640,39 +680,39 @@ class Physics_Genie {
             getTable('pg_user_stats'),
             array(
               'num_presented' => $curr_focus_stats->num_presented + 1,
-              'num_correct' => $curr_focus_stats->num_correct + ($request_data['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_focus_stats->avg_attempts * $curr_focus_stats->num_presented + intval($request_data['num_attempts']))/($curr_focus_stats->num_presented + 1),
+              'num_correct' => $curr_focus_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
+              'avg_attempts' => ($curr_focus_stats->avg_attempts * $curr_focus_stats->num_presented + intval($json['num_attempts']))/($curr_focus_stats->num_presented + 1),
               'xp' => $focus_xp,
-              'streak' => ($request_data['correct'] === 'true' ? ($focus_streak > 0 ? $focus_streak + 1 : 1) : ($focus_streak > 0 ? -1 : $focus_streak - 1)),
-              'longest_winstreak' => (($request_data['correct'] === 'true' && $focus_streak >= $curr_focus_stats->longest_winstreak) ? ($focus_streak + 1) : ($request_data['correct'] === 'true' && $curr_focus_stats->longest_winstreak === 0 ? 1 : $curr_focus_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($request_data['correct'] === 'true') && -1*$focus_streak >= $curr_focus_stats->longest_losestreak) ? (1 - $focus_streak) : (!($request_data['correct'] === 'true') && $curr_focus_stats->longest_losestreak == 0 ? 1 : $curr_focus_stats->longest_losestreak))
+              'streak' => ($json['correct'] === 'true' ? ($focus_streak > 0 ? $focus_streak + 1 : 1) : ($focus_streak > 0 ? -1 : $focus_streak - 1)),
+              'longest_winstreak' => (($json['correct'] === 'true' && $focus_streak >= $curr_focus_stats->longest_winstreak) ? ($focus_streak + 1) : ($json['correct'] === 'true' && $curr_focus_stats->longest_winstreak === 0 ? 1 : $curr_focus_stats->longest_winstreak)),
+              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$focus_streak >= $curr_focus_stats->longest_losestreak) ? (1 - $focus_streak) : (!($json['correct'] === 'true') && $curr_focus_stats->longest_losestreak == 0 ? 1 : $curr_focus_stats->longest_losestreak))
             ),
             array(
               'user_id' => get_current_user_id(),
-              'topic' => $request_data['topic'],
-              'focus' => $request_data['focus']
+              'topic' => $json['topic'],
+              'focus' => $json['focus']
             ),
             null,
             array('%d', '%s', '%s')
           );
 
           //Topic stats
-          $curr_topic_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$request_data['topic']."' AND focus = 'z';")[0];
+          $curr_topic_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$json['topic']."' AND focus = 'z';")[0];
 
           $wpdb->update(
             getTable('pg_user_stats'),
             array(
               'num_presented' => $curr_topic_stats->num_presented + 1,
-              'num_correct' => $curr_topic_stats->num_correct + ($request_data['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_topic_stats->avg_attempts * $curr_topic_stats->num_presented + intval($request_data['num_attempts']))/($curr_topic_stats->num_presented + 1),
+              'num_correct' => $curr_topic_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
+              'avg_attempts' => ($curr_topic_stats->avg_attempts * $curr_topic_stats->num_presented + intval($json['num_attempts']))/($curr_topic_stats->num_presented + 1),
               'xp' => $curr_topic_stats->xp-$curr_focus_stats->xp+$focus_xp,
-              'streak' => ($request_data['correct'] === 'true' ? ($curr_topic_stats->streak > 0 ? $curr_topic_stats->streak + 1 : 1) : ($curr_topic_stats->streak > 0 ? -1 : $curr_topic_stats->streak - 1)),
-              'longest_winstreak' => (($request_data['correct'] === 'true' && $curr_topic_stats->streak >= $curr_topic_stats->longest_winstreak) ? ($curr_topic_stats->streak + 1) : ($request_data['correct'] === 'true' && $curr_topic_stats->longest_winstreak === 0 ? 1 : $curr_topic_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($request_data['correct'] === 'true') && -1*$curr_topic_stats->streak >= $curr_topic_stats->longest_losestreak) ? (1 - $curr_topic_stats->streak) : (!($request_data['correct'] === 'true') && $curr_topic_stats->longest_losestreak == 0 ? 1 : $curr_topic_stats->longest_losestreak))
+              'streak' => ($json['correct'] === 'true' ? ($curr_topic_stats->streak > 0 ? $curr_topic_stats->streak + 1 : 1) : ($curr_topic_stats->streak > 0 ? -1 : $curr_topic_stats->streak - 1)),
+              'longest_winstreak' => (($json['correct'] === 'true' && $curr_topic_stats->streak >= $curr_topic_stats->longest_winstreak) ? ($curr_topic_stats->streak + 1) : ($json['correct'] === 'true' && $curr_topic_stats->longest_winstreak === 0 ? 1 : $curr_topic_stats->longest_winstreak)),
+              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$curr_topic_stats->streak >= $curr_topic_stats->longest_losestreak) ? (1 - $curr_topic_stats->streak) : (!($json['correct'] === 'true') && $curr_topic_stats->longest_losestreak == 0 ? 1 : $curr_topic_stats->longest_losestreak))
             ),
             array(
               'user_id' => get_current_user_id(),
-              'topic' => $request_data['topic'],
+              'topic' => $json['topic'],
               'focus' => 'z'
             ),
             null,
@@ -686,12 +726,12 @@ class Physics_Genie {
             getTable('pg_user_stats'),
             array(
               'num_presented' => $curr_user_stats->num_presented + 1,
-              'num_correct' => $curr_user_stats->num_correct + ($request_data['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_user_stats->avg_attempts * $curr_user_stats->num_presented + intval($request_data['num_attempts']))/($curr_user_stats->num_presented + 1),
+              'num_correct' => $curr_user_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
+              'avg_attempts' => ($curr_user_stats->avg_attempts * $curr_user_stats->num_presented + intval($json['num_attempts']))/($curr_user_stats->num_presented + 1),
               'xp' => $curr_user_stats->xp-$curr_focus_stats->xp+$focus_xp,
-              'streak' => ($request_data['correct'] === 'true' ? ($curr_user_stats->streak > 0 ? $curr_user_stats->streak + 1 : 1) : ($curr_user_stats->streak > 0 ? -1 : $curr_user_stats->streak - 1)),
-              'longest_winstreak' => (($request_data['correct'] === 'true' && $curr_user_stats->streak >= $curr_user_stats->longest_winstreak) ? ($curr_user_stats->streak + 1) : ($request_data['correct'] === 'true' && $curr_user_stats->longest_winstreak === 0 ? 1 : $curr_user_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($request_data['correct'] === 'true') && -1*$curr_user_stats->streak >= $curr_user_stats->longest_losestreak) ? (1 - $curr_user_stats->streak) : (!($request_data['correct'] === 'true') && $curr_user_stats->longest_losestreak == 0 ? 1 : $curr_user_stats->longest_losestreak))
+              'streak' => ($json['correct'] === 'true' ? ($curr_user_stats->streak > 0 ? $curr_user_stats->streak + 1 : 1) : ($curr_user_stats->streak > 0 ? -1 : $curr_user_stats->streak - 1)),
+              'longest_winstreak' => (($json['correct'] === 'true' && $curr_user_stats->streak >= $curr_user_stats->longest_winstreak) ? ($curr_user_stats->streak + 1) : ($json['correct'] === 'true' && $curr_user_stats->longest_winstreak === 0 ? 1 : $curr_user_stats->longest_winstreak)),
+              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$curr_user_stats->streak >= $curr_user_stats->longest_losestreak) ? (1 - $curr_user_stats->streak) : (!($json['correct'] === 'true') && $curr_user_stats->longest_losestreak == 0 ? 1 : $curr_user_stats->longest_losestreak))
             ),
             array(
               'user_id' => get_current_user_id(),
@@ -721,7 +761,8 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'external-request', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          return $this->CallAPI($request_data["method"], $request_data["url"], $request_data["data"]);
+          $json = json_decode($request_data);
+          return $this->CallAPI($json["method"], $json["url"], $json["data"]);
         }
       ));
 
@@ -773,10 +814,11 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-name', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
           return $wpdb->update('wp_users', array(
-            'user_login' => $request_data['name'],
-            'user_nicename' => $request_data['name']
+            'user_login' => $json['name'],
+            'user_nicename' => $json['name']
           ), array(
             'ID' => get_current_user_id()
           ), null, array('%d'));
@@ -802,12 +844,13 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-setup', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
           return $wpdb->update(getTable('pg_users'), array(
-            'curr_diff' => intval($request_data['curr_diff']),
-            'curr_topics' => $request_data['curr_topics'],
-            'curr_foci' => $request_data['curr_foci'],
-            'calculus' => $request_data['calculus'] === 'true' ? 1 : 0
+            'curr_diff' => intval($json['curr_diff']),
+            'curr_topics' => $json['curr_topics'],
+            'curr_foci' => $json['curr_foci'],
+            'calculus' => $json['calculus'] === 'true' ? 1 : 0
           ), array(
             'user_id' => get_current_user_id()
           ), array('%d', '%s', '%s', '%d'), array('%d'));
@@ -844,26 +887,27 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'edit-problem', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
+          $json = json_decode($request_data);
           global $wpdb;
           return $wpdb->update(getTable('pg_problems'), array(
-            'problem_text' => $request_data['problem_text'],
-            'diagram' => ($request_data['diagram'] === "" ? null : $request_data['diagram']),
-            'answer' => $request_data['answer'],
-            'must_match' => ($request_data['must_match'] === 'true' ? 1 : 0),
-            'error' => floatval($request_data['error']),
-            'solution' => $request_data['solution'],
-            'solution_diagram' => ($request_data['solution_diagram'] === "" ? null : $request_data['solution_diagram']),
-            'hint_one' => $request_data['hint_one'],
-            'hint_two' => ($request_data['hint_two'] === "" ? null : $request_data['hint_two']),
-            'source' => intval($request_data['source']),
-            'number_in_source' => $request_data['number_in_source'],
-            'difficulty' => intval($request_data['difficulty']),
-            'calculus' => $request_data['calculus'],
-            'topic' => $request_data['topic'],
-            'main_focus' => $request_data['main_focus'],
-            'other_foci' => ($request_data['other_foci'] === "" ? null: $request_data['other_foci'])
+            'problem_text' => $json['problem_text'],
+            'diagram' => ($json['diagram'] === "" ? null : $json['diagram']),
+            'answer' => $json['answer'],
+            'must_match' => ($json['must_match'] === 'true' ? 1 : 0),
+            'error' => floatval($json['error']),
+            'solution' => $json['solution'],
+            'solution_diagram' => ($json['solution_diagram'] === "" ? null : $json['solution_diagram']),
+            'hint_one' => $json['hint_one'],
+            'hint_two' => ($json['hint_two'] === "" ? null : $json['hint_two']),
+            'source' => intval($json['source']),
+            'number_in_source' => $json['number_in_source'],
+            'difficulty' => intval($json['difficulty']),
+            'calculus' => $json['calculus'],
+            'topic' => $json['topic'],
+            'main_focus' => $json['main_focus'],
+            'other_foci' => ($json['other_foci'] === "" ? null: $json['other_foci'])
           ), array(
-            'problem_id' => $request_data['problem_id']
+            'problem_id' => $json['problem_id']
           ), null, array('%d'));
         }
       ));
@@ -875,11 +919,6 @@ class Physics_Genie {
   //  global $seconddb;
   //  $seconddb = new wpdb("physicsgenius", "Morin137!", "wordpress", "restored-instance-7-12-21.c4npn2kwj61c.us-west-1.rds.amazonaws.com");
   // }
-
-  // Test function
-  public function test() {
-    return getTable('pg_user_stats');
-  }
 
   // Call backend deploy script
   public function deploy_backend() {
