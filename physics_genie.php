@@ -2,11 +2,35 @@
 
 /*
 Plugin Name: physics_genie
-*/
+ */
+
 function add_cors_http_header(){
   header("Access-Control-Allow-Origin: *");
 }
-add_action('init','add_cors_http_header');
+
+// Change the wordpress login logo
+function change_logo() { ?>
+  <style type="text/css">
+    #login h1 a, .login h1 a {
+      background-image: url("https://physicsgenie.ga/wp-content/uploads/2021/03/Logo.png");
+      height: 80px;
+      width: 112px;
+      background-size: 112px 80px;
+      background-repeat: no-repeat;
+      padding-bottom: 30px;
+    }
+  </style>
+<?php }
+
+// Change login page links
+add_filter( 'login_redirect', function() { return home_url(); });
+add_filter( 'login_headertitle', function() { return 'Physicsgenie'; } );
+add_filter( 'login_headerurl', function() { return home_url(); } );
+add_filter( 'login_url', function() { return 'https://app.physicsgenie.ga/login'; });
+add_filter( 'register_url', function() { return 'https://app.physicsgenie.ga/register'; });
+add_filter( 'lostpassword_url', function() { return 'https://app.physicsgenie.ga/password-reset'; });
+add_action( 'login_enqueue_scripts', 'change_logo' );
+add_action( 'init', 'add_cors_http_header' );
 
 
 class Physics_Genie {
@@ -182,18 +206,18 @@ class Physics_Genie {
 
     switch ($method)
     {
-      case "POST":
-        curl_setopt($curl, CURLOPT_POST, 1);
+    case "POST":
+      curl_setopt($curl, CURLOPT_POST, 1);
 
-        if ($data)
-          curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
-        break;
-      case "PUT":
-        curl_setopt($curl, CURLOPT_PUT, 1);
-        break;
-      default:
-        if ($data)
-          $url = sprintf("%s?%s", $url, http_build_query($data));
+      if ($data)
+        curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+      break;
+    case "PUT":
+      curl_setopt($curl, CURLOPT_PUT, 1);
+      break;
+    default:
+      if ($data)
+        $url = sprintf("%s?%s", $url, http_build_query($data));
     }
 
     curl_setopt($curl, CURLOPT_URL, $url);
@@ -350,7 +374,7 @@ class Physics_Genie {
 
     foreach ($wpdb->get_results("SELECT topic, focus FROM pg_topics;", OBJECT) as $focus) {
       $wpdb->insert(
-      'pg_user_stats',
+        'pg_user_stats',
         array(
           'user_id' => $user_id,
           'topic' => $focus->topic,
