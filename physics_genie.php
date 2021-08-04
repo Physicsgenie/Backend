@@ -57,20 +57,38 @@ class Physics_Genie {
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
           'callback' => function($data) {
-
+            // Replace foci string with serialized array
             global $wpdb;
-            $wpdb->insert(
-              getTable('pg_topics'),
-              array(
-              'name' => serialize(
-                array(
-                  9,
-                  10,
-                )
-              )
-              )
+            $users = $wpdb->get_results(
+              "SELECT user_id, curr_foci
+              FROM wordpress.".getTable('pg_users').";"
             );
 
+            $response = [];
+            foreach ( $users as $user ) {
+              $foci = [];
+              $str = $user -> curr_foci;
+              $chars = str_split($str);
+              foreach ( $chars as $char ) {
+                $focus_id = $wpdb -> get_results("
+                  SELECT topics_id
+                  FROM wordpress.".getTable('pg_topics_backup')."
+                  WHERE focus = '".$char."'
+                ;")[0] -> topics_id;
+                array_push($foci, $focus_id);
+              }
+              array_push($response, $foci);
+              $wpdb->update(
+                getTable('pg_users_new'),
+                array(
+                  'curr_foci' => serialize($foci)
+                ),
+                array(
+                  'user_id' => $user -> user_id
+                )
+              );
+            }
+            return $response;
           }
         ));
       }
@@ -125,7 +143,7 @@ class Physics_Genie {
        * @apiSuccess {String} calculus Whether problem requires calculus to solve ("None", "Required", or "Help").
        * @apiSuccess {String} topic Character id of topic of problem.
        * @apiSuccess {String} main_focus Character id of primary focus of problem.
-       * @apiSuccess {String} other_foci String of concatenated character ids of various other foci of problem.
+       * @apiSuccess {String} other_foci Array of focus_ids corresponding to each focus.
        * @apiSuccess {String} date_added Date problem was submitted.
        */
       register_rest_route('physics_genie', 'problem', array(
@@ -218,7 +236,7 @@ class Physics_Genie {
        * @apiSuccess {String} calculus Whether problem requires calculus to solve ("None", "Required", or "Help").
        * @apiSuccess {String} topic Character id of topic of problem.
        * @apiSuccess {String} main_focus Character id of primary focus of problem.
-       * @apiSuccess {String} other_foci String of concatenated character ids of various other foci of problem.
+       * @apiSuccess {String} other_foci Array of focus_ids corresponding to each focus.
        * @apiSuccess {String} date_added Date problem was submitted.
        */
       register_rest_route('physics_genie', 'problem/(?P<problem>\d+)', array(
@@ -295,7 +313,7 @@ class Physics_Genie {
        * @apiSuccess {Object} setup All return data (see other fields) is contained within this object.
        * @apiSuccess {String} curr_diff Current difficulty of user (0-2).
        * @apiSuccess {String} curr_topics String of concatenated character ids of current topics in user's settings.
-       * @apiSuccess {String} curr_foci String of concatenated character ids of current foci in user's settings.
+       * @apiSuccess {String} curr_foci array of concatenated character ids of current foci in user's settings.
        * @apiSuccess {String} calculus Whether or not calculus problems are allowed ("1" if calculus is allowed, "0" otherwise).
        */
       register_rest_route('physics_genie', 'user-info', array(
@@ -546,7 +564,7 @@ class Physics_Genie {
        * @apiParam {String} calculus Whether problem requires calculus to solve ("None", "Required", or "Help").
        * @apiParam {String} topic Character id of topic of problem.
        * @apiParam {String} main_focus Character id of primary focus of problem.
-       * @apiParam {String} other_foci String of concatenated character ids of various other foci of problem. Empty string if no other foci.
+       * @apiParam {String} other_foci Array of focus_ids. Empty string if no other foci.
        *
        * @apiSuccess {Number} data Id of new problem in problem database on success.
        */
@@ -575,7 +593,7 @@ class Physics_Genie {
               'calculus' => $json['calculus'],
               'topic' => $json['topic'],
               'main_focus' => $json['main_focus'],
-              'other_foci' => ($json['other_foci'] === "" ? null: $json['other_foci']),
+              'other_foci' => ($json['other_foci'] === "" ? null: serialize($json['other_foci'])),
               'date_added' => date('Y-m-d')
             )
           );
@@ -880,7 +898,7 @@ class Physics_Genie {
        * @apiParam {String} calculus Whether problem requires calculus to solve ("None", "Required", or "Help").
        * @apiParam {String} topic Character id of topic of problem.
        * @apiParam {String} main_focus Character id of primary focus of problem.
-       * @apiParam {String} other_foci String of concatenated character ids of various other foci of problem. Empty string if no other foci.
+       * @apiParam {String} other_foci Array of focus_ids. Empty string if no other foci.
        *
        * @apiSuccess {Number} data Returns 1 on success.
        */
@@ -905,7 +923,7 @@ class Physics_Genie {
             'calculus' => $json['calculus'],
             'topic' => $json['topic'],
             'main_focus' => $json['main_focus'],
-            'other_foci' => ($json['other_foci'] === "" ? null: $json['other_foci'])
+            'other_foci' => ($json['other_foci'] === "" ? null: serialize($json['other_foci']))
           ), array(
             'problem_id' => $json['problem_id']
           ), null, array('%d'));
