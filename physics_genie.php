@@ -33,12 +33,14 @@ class Physics_Genie {
       register_rest_route( 'physics_genie', '/git-deploy-backend', array(
         'methods'  => 'POST',
         'callback' => array($this, 'deploy_backend'),
+        'permission_callback' => '__return_true'
       ));
 
       // Registers the path /physics_genie/git-deploy-frontend to update the webapp
       register_rest_route( 'physics_genie', '/git-deploy-frontend', array(
         'methods'  => 'POST',
         'callback' => array($this, 'deploy_frontend'),
+        'permission_callback' => '__return_true'
       ));
 
       register_rest_route('physics_genie', 'user-metadata', array(
@@ -49,47 +51,52 @@ class Physics_Genie {
           $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
 
           return $data;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
-      // Test functions endpoint
-      if($GLOBALS['DEBUG']){
-        register_rest_route('physics_genie', 'test', array(
-          'methods' => 'GET',
-          'callback' => function($data) {
+      function serializeColumn($table, $newTable, $index, $column) {
             // Replace foci string with serialized array
             global $wpdb;
-            $users = $wpdb->get_results(
-              "SELECT user_id, curr_foci
-              FROM wordpress.".getTable('pg_users').";"
+            $rows = $wpdb->get_results(
+              "SELECT ".$index.", ".$column."
+              FROM wordpress.".getTable($table).";"
             );
 
-            $response = [];
-            foreach ( $users as $user ) {
+            foreach ( $rows as $row ) {
               $foci = [];
-              $str = $user -> curr_foci;
+              $str = $row -> $column;
               $chars = str_split($str);
               foreach ( $chars as $char ) {
                 $focus_id = $wpdb -> get_results("
                   SELECT topics_id
-                  FROM wordpress.".getTable('pg_topics_backup')."
+                  FROM wordpress.".getTable('pg_topics_old')."
                   WHERE focus = '".$char."'
                 ;")[0] -> topics_id;
                 array_push($foci, $focus_id);
               }
               array_push($response, $foci);
               $wpdb->update(
-                getTable('pg_users_new'),
+                getTable($newTable),
                 array(
-                  'curr_foci' => serialize($foci)
+                  $column => serialize($foci)
                 ),
                 array(
-                  'user_id' => $user -> user_id
+                  $index => $row -> $index
                 )
               );
             }
-            return $response;
-          }
+      }
+
+      // Test functions endpoint
+      if($GLOBALS['DEBUG']){
+        register_rest_route('physics_genie', 'test', array(
+          'methods' => 'GET',
+          'callback' => function($data) {
+
+
+          },
+          'permission_callback' => '__return_true'
         ));
       }
 
@@ -114,7 +121,8 @@ class Physics_Genie {
           $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
 
           return $data;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -153,38 +161,38 @@ class Physics_Genie {
 
           if ($wpdb->get_results("SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";")[0]->curr_problem === null) {
 
-            $problem = $wpdb->get_results(
-              "SELECT *
-        FROM wordpress.".getTable('pg_problems')."
-        WHERE
-            (SELECT curr_topics
-             FROM wordpress.".getTable('pg_users')."
-             WHERE user_id = 1) LIKE CONCAT('%', topic, '%')
-          AND
-            (SELECT curr_foci
-             FROM wordpress.".getTable('pg_users')."
-             WHERE user_id = ".get_current_user_id().") LIKE CONCAT('%', main_focus, '%')
-          AND difficulty >
-            (SELECT curr_diff
-             FROM wordpress.".getTable('pg_users')."
-             WHERE user_id = 1)
-          AND difficulty <=
-            (SELECT curr_diff
-             FROM wordpress.".getTable('pg_users')."
-             WHERE user_id = ".get_current_user_id().") + IF(
-                (SELECT curr_diff
-                FROM wordpress.".getTable('pg_users')."
-                WHERE user_id = ".get_current_user_id().") = 2, 3, 2)
-          AND IF(
-                   (SELECT calculus
+            $foci = $wpdb -> get_results("
+              SELECT curr_foci
+              FROM wordpress.".getTable('pg_users')."
+              WHERE user_id = ".get_current_user_id()."
+            ;")[0] -> curr_foci;
+
+            $fociCond = implode(', ', unserialize($foci));
+
+            $difficulty = $wpdb -> get_results("
+              SELECT curr_diff
+              FROM wordpress.".getTable('pg_users')."
+              WHERE user_id = ".get_current_user_id()."
+            ;")[0] -> curr_diff;
+
+            $problem = $wpdb->get_results("
+              SELECT *
+              FROM wordpress.".getTable('pg_problems')."
+              WHERE
+                main_focus IN (".$fociCond.")
+                AND difficulty > ".$difficulty."
+                AND difficulty <= ".($difficulty + 2)."
+                AND IF(
+                    (SELECT calculus
                     FROM wordpress.".getTable('pg_users')."
                     WHERE user_id = ".get_current_user_id()."), TRUE, calculus != 'Required')
-          AND problem_id NOT IN
-            (SELECT problem_id
-             FROM wordpress.".getTable('pg_user_problems')."
-             WHERE user_id = ".get_current_user_id().")
-        ORDER BY RAND()
-        LIMIT 1;");
+                AND problem_id NOT IN
+                  (SELECT problem_id
+                   FROM wordpress.".getTable('pg_user_problems')."
+                   WHERE user_id = ".get_current_user_id().")
+              ORDER BY RAND()
+              LIMIT 1
+              ;");
 
             if (count($problem) == 0) {
               return null;
@@ -203,13 +211,21 @@ class Physics_Genie {
                 array('%d')
               );
 
-              return $problem;
+              $problem -> other_foci = unserialize($problem -> other_foci);
+              return new WP_REST_RESPONSE($problem);
             }
 
           } else {
-            return $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE problem_id = (SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id  = ".get_current_user_id().");")[0];
+            $problem = $wpdb->get_results("
+              SELECT * FROM ".getTable('pg_problems')."
+              WHERE problem_id = (SELECT curr_problem FROM ".getTable('pg_users')."
+              WHERE user_id  = ".get_current_user_id().")
+            ;")[0];
+            $problem -> other_foci = unserialize($problem -> other_foci);
+            return json_encode($problem);
           }
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -247,7 +263,8 @@ class Physics_Genie {
           $problem = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE ".getTable('pg_problems').".problem_id = ".$data['problem'].";")[0];
 
           return $problem;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -273,7 +290,8 @@ class Physics_Genie {
           }
 
           return $problem;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -298,7 +316,8 @@ class Physics_Genie {
           $data->source_categories = $wpdb->get_results("SELECT DISTINCT category FROM ".getTable('pg_sources')." ORDER BY category;");
           $data->sources = $wpdb->get_results("SELECT * FROM ".getTable('pg_sources')." ORDER BY source;");
           return $data;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -327,7 +346,8 @@ class Physics_Genie {
 
 
           return $data;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -375,7 +395,8 @@ class Physics_Genie {
       ORDER BY topic, focus;");
 
           return $stats;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -467,7 +488,8 @@ class Physics_Genie {
           }
 
           return [];
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -501,7 +523,8 @@ class Physics_Genie {
 
           return wp_mail($user_email, "[Physics Genie] Password Reset", $message);
 
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -537,7 +560,8 @@ class Physics_Genie {
           );
 
           return $wpdb->insert_id;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -599,7 +623,8 @@ class Physics_Genie {
           );
 
           return $wpdb->insert_id;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -631,7 +656,8 @@ class Physics_Genie {
           );
 
           return $wpdb->insert_id;
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -761,7 +787,9 @@ class Physics_Genie {
           );
 
           return 1;
-        }
+        },
+        'permission_callback' => '__return_true'
+
       ));
 
 
@@ -781,7 +809,9 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data);
           return $this->CallAPI($json["method"], $json["url"], $json["data"]);
-        }
+        },
+        'permission_callback' => '__return_true'
+
       ));
 
 
@@ -813,7 +843,9 @@ class Physics_Genie {
             null,
             array('%d')
           );
-        }
+        },
+        'permission_callback' => '__return_true'
+
       ));
 
 
@@ -840,7 +872,8 @@ class Physics_Genie {
           ), array(
             'ID' => get_current_user_id()
           ), null, array('%d'));
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -872,7 +905,8 @@ class Physics_Genie {
           ), array(
             'user_id' => get_current_user_id()
           ), array('%d', '%s', '%s', '%d'), array('%d'));
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
 
@@ -927,7 +961,8 @@ class Physics_Genie {
           ), array(
             'problem_id' => $json['problem_id']
           ), null, array('%d'));
-        }
+        },
+        'permission_callback' => '__return_true'
       ));
 
     });
