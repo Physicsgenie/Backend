@@ -72,7 +72,7 @@ class Physics_Genie {
             FROM wordpress.".getTable('pg_topics_old')."
             WHERE focus = '".$char."'
           ;")[0] -> topics_id;
-          $wpdb->update(
+          $wpdb -> update(
             getTable($newTable),
             array(
               $column => $focus_id
@@ -123,7 +123,7 @@ class Physics_Genie {
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
           'callback' => function($request){
-              updateFocus('wpstg0_pg_user_stats', 'wpstg0_pg_user_stats_new', 'user_stats_id', 'focus');
+              updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
 
           },
           'permission_callback' => '__return_true'
@@ -307,11 +307,12 @@ class Physics_Genie {
           global $wpdb;
 
           $problem = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE ".getTable('pg_problems').".problem_id = ".$data['problem'].";")[0];
+
           $problem -> topic = $wpdb -> get_results("
-            SELECT topic_id
+            SELECT topic
             FROM ".getTable("pg_foci")."
             WHERE focus_id = ".($problem -> main_focus)."
-          ;")[0] -> topic_id;
+          ;")[0] -> topic;
 
           $problem -> other_foci = unserialize($problem -> other_foci);
 
