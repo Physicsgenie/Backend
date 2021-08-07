@@ -123,7 +123,8 @@ class Physics_Genie {
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
           'callback' => function($request){
-              updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
+              // Update main_focus in pg_problems
+              // updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
 
           },
           'permission_callback' => '__return_true'
@@ -368,10 +369,25 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
           $data = (object)[];
-          $data->topics = $wpdb->get_results("SELECT topic, name FROM ".getTable('pg_topics')." WHERE focus = 'z';");
-          $data->focuses = $wpdb->get_results("SELECT topic, focus, name FROM ".getTable('pg_topics')." WHERE topic = 0 AND focus != 'z';");
-          $data->source_categories = $wpdb->get_results("SELECT DISTINCT category FROM ".getTable('pg_sources')." ORDER BY category;");
-          $data->sources = $wpdb->get_results("SELECT * FROM ".getTable('pg_sources')." ORDER BY source;");
+
+          $data->topics = $wpdb->get_results("
+            SELECT * FROM ".getTable('pg_topics')." 
+          ");
+
+          $data->focuses = $wpdb->get_results("
+            SELECT * FROM ".getTable('pg_foci')."
+          ;");
+
+          $data->source_categories = $wpdb->get_results("
+            SELECT DISTINCT category FROM ".getTable('pg_sources')." 
+            ORDER BY category
+          ;");
+
+          $data->sources = $wpdb->get_results("
+            SELECT * FROM ".getTable('pg_sources')." 
+            ORDER BY source
+          ;");
+
           return json_encode($data);
         },
         'permission_callback' => '__return_true'
