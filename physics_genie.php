@@ -6,7 +6,9 @@ Plugin Name: physics_genie
 function add_cors_http_header(){
   header("Access-Control-Allow-Origin: *");
 }
+
 add_action('init','add_cors_http_header');
+add_action('jwt_auth_expire', 'test_jwt_auth_expire');
 
 // Reads the debug config from config.php
 require_once('config.php');
@@ -58,7 +60,7 @@ class Physics_Genie {
       // Change focus char to id
       function updateFocus($table, $newTable, $index, $column) {
         global $wpdb;
-        $rows = $wpdb->get_results(
+        $rows = $wpdb -> get_results(
           "SELECT ".$index.", ".$column."
           FROM wordpress.".getTable($table).";"
         );
@@ -86,7 +88,7 @@ class Physics_Genie {
       // Replace foci string with serialized array
       function serializeColumn($table, $newTable, $index, $column) {
         global $wpdb;
-        $rows = $wpdb->get_results(
+        $rows = $wpdb -> get_results(
           "SELECT ".$index.", ".$column."
           FROM wordpress.".getTable($table).";"
         );
@@ -103,7 +105,8 @@ class Physics_Genie {
             ;")[0] -> topics_id;
             array_push($foci, $focus_id);
           }
-          $wpdb->update(
+
+          $wpdb -> update(
             getTable($newTable),
             array(
               $column => serialize($foci)
@@ -147,7 +150,7 @@ class Physics_Genie {
 
           $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
 
-          return $data;
+          return json_encode($data);
         },
         'permission_callback' => '__return_true'
       ));
@@ -240,10 +243,10 @@ class Physics_Genie {
 
               $problem -> other_foci = unserialize($problem -> other_foci);
               $problem -> topic = $wpdb -> get_results("
-                SELECT topic_id
+                SELECT topic
                 FROM ".getTable("pg_foci")."
                 WHERE focus_id = ".($problem -> main_focus)."
-              ;");
+              ;")[0] -> topic;
 
             $foci = $wpdb -> get_results("
               SELECT curr_foci
@@ -261,10 +264,10 @@ class Physics_Genie {
             ;")[0];
             $problem -> other_foci = unserialize($problem -> other_foci);
             $problem -> topic = $wpdb -> get_results("
-              SELECT topic_id
+              SELECT topic
               FROM ".getTable("pg_foci")."
               WHERE focus_id = ".($problem -> main_focus)."
-            ;");
+            ;")[0] -> topic;
             return json_encode($problem);
           }
         },
@@ -501,23 +504,6 @@ class Physics_Genie {
                 )
               ),
               'calculus' => 1,
-            )
-          );
-
-          $wpdb->insert(
-            getTable('pg_user_stats'),
-            array(
-              'user_id' => $user_id,
-              'topic' => 'z',
-              'focus' => 'z',
-              'num_presented' => 0,
-              'num_saved' => 0,
-              'num_correct' => 0,
-              'avg_attempts' => 0,
-              'xp' => 0,
-              'streak' => 0,
-              'longest_winstreak' => 0,
-              'longest_losestreak' => 0
             )
           );
 
