@@ -456,25 +456,44 @@ class Physics_Genie {
           $json = json_decode($request_data);
           global $wpdb;
 
+          $stats = [];
+          $stats = (object)[];
+          
+          $foci = $wpdb -> get_results("
+            SELECT focus_id, topic
+            FROM ".getTable('pg_foci')."
+          ;");
 
-          $stats = $wpdb->get_results(
-            "SELECT
-        topic,
-        focus,
-        num_presented,
-        num_correct,
-        avg_attempts,
-        xp,
-        streak,
-        longest_winstreak,
-        longest_losestreak
-        FROM wordpress.".getTable('pg_user_stats')."
-        WHERE user_id = ".get_current_user_id()."
-          AND ".(isset($json['topic']) ? 'topic = "'.$json['topic'].'"' : 'true')."
-          AND ".(isset($json['focus']) ? 'focus = "'.$json['focus'].'"' : 'true')."
-      ORDER BY topic, focus;");
+          $attempts = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_user_attempts')."
+          ;");
 
-          return json_encode($stats);
+          foreach ($foci as $focus) {
+            $stat = (object)[];
+            $stat -> topic = $focus -> topic;
+            $stat -> focus = $focus -> focus_id; 
+          }
+
+          $stats = $wpdb->get_results("
+            SELECT
+              topic,
+              focus,
+              num_presented,
+              num_correct,
+              avg_attempts,
+              xp,
+              streak,
+              longest_winstreak,
+              longest_losestreak
+            FROM wordpress.".getTable('pg_user_stats')."
+            WHERE user_id = ".get_current_user_id()."
+              AND ".(isset($json['topic']) ? 'topic = "'.$json['topic'].'"' : 'true')."
+              AND ".(isset($json['focus']) ? 'focus = "'.$json['focus'].'"' : 'true')."
+            ORDER BY topic, focus
+          ;");
+
+          return $stats;
         },
         'permission_callback' => '__return_true'
       ));
