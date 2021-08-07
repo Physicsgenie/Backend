@@ -370,20 +370,20 @@ class Physics_Genie {
           global $wpdb;
           $data = (object)[];
 
-          $data->topics = $wpdb->get_results("
+          $data -> topics = $wpdb -> get_results("
             SELECT * FROM ".getTable('pg_topics')." 
           ");
 
-          $data->focuses = $wpdb->get_results("
+          $data -> focuses = $wpdb -> get_results("
             SELECT * FROM ".getTable('pg_foci')."
           ;");
 
-          $data->source_categories = $wpdb->get_results("
+          $data -> source_categories = $wpdb -> get_results("
             SELECT DISTINCT category FROM ".getTable('pg_sources')." 
             ORDER BY category
           ;");
 
-          $data->sources = $wpdb->get_results("
+          $data -> sources = $wpdb -> get_results("
             SELECT * FROM ".getTable('pg_sources')." 
             ORDER BY source
           ;");
@@ -415,8 +415,15 @@ class Physics_Genie {
 
           $data = (object)[];
 
-          $data->setup = $wpdb->get_results("SELECT curr_diff, curr_topics, curr_foci, calculus FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";")[0];
+          $data -> setup = $wpdb -> get_results("
+            SELECT curr_diff, curr_topics, curr_foci, calculus 
+            FROM ".getTable('pg_users')." 
+            WHERE user_id = ".get_current_user_id()."
+          ;")[0];
 
+          $data -> setup -> curr_topics = unserialize($data -> setup -> curr_topics);
+
+          $data -> setup -> curr_foci = unserialize($data -> setup -> curr_foci);
 
           return json_encode($data);
         },
