@@ -15,9 +15,10 @@ require_once('config.php');
 
 // Parses db names to add staging if debug is set
 function getTable($tab) {
-  $prefix = "wpstg0_";
-  if($GLOBALS['DEBUG'])
+  if($GLOBALS['DEBUG']){
+    global $prefix;
     return $prefix.$tab;
+  }
   else
     return $tab;
 }
