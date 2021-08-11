@@ -8,7 +8,6 @@ function add_cors_http_header(){
 }
 
 add_action('init','add_cors_http_header');
-add_action('jwt_auth_expire', 'test_jwt_auth_expire');
 
 // Reads the debug config from config.php
 require_once('config.php');
@@ -16,8 +15,8 @@ require_once('config.php');
 // Parses db names to add staging if debug is set
 function getTable($tab) {
   if($GLOBALS['DEBUG']){
-    global $prefix;
-    return $prefix.$tab;
+    global $PREFIX;
+    return $PREFIX.$tab;
   }
   else
     return $tab;
@@ -119,6 +118,35 @@ class Physics_Genie {
         }
       }
 
+      function convertAttempts($table, $newTable){
+        global $wpdb;
+        $problems = $wpdb -> get_results("
+          SELECT *
+          FROM wordpress.".getTable($table)."
+        ;");
+
+        foreach( $problems as $problem ){
+          $attempts = $problem -> num_attempts;
+          for( $i = 1; $i <= $attempts; $i++ ){
+            if( $i == $attempts && $problem -> correct === "1" )
+              $correct = 1;
+            else
+              $correct = 0;
+
+            $wpdb -> insert(
+              getTable($newTable),
+              array(
+                'user_id' => $problem -> user_id,
+                'problem_id' => $problem -> problem_id,
+                'student_answer' => '',
+                'correct' => $correct,
+                'date_attempted' => $problem -> date_attempted,
+              )
+            );
+          }
+        }
+      }
+
       // Test functions endpoint
       if($GLOBALS['DEBUG']){
         register_rest_route('physics_genie', 'test', array(
@@ -126,8 +154,8 @@ class Physics_Genie {
           'callback' => function($request){
               // Update main_focus in pg_problems
               // updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
-
-          },
+            convertAttempts('pg_user_problems', 'pg_user_attempts');
+         },
           'permission_callback' => '__return_true'
         ));
       }
