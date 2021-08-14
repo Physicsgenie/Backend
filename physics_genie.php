@@ -486,24 +486,53 @@ class Physics_Genie {
           global $wpdb;
 
           $stats = [];
-          $stats = (object)[];
-          
-          $foci = $wpdb -> get_results("
-            SELECT focus_id, topic
-            FROM ".getTable('pg_foci')."
+
+          $topics = $wpdb -> get_results("
+            SELECT topic_id, name 
+            FROM ".getTable('pg_topics')."
           ;");
 
+          
           $attempts = $wpdb -> get_results("
             SELECT *
             FROM ".getTable('pg_user_attempts')."
+            WHERE user_id = 118 
+            ORDER BY date_attempted ASC, problem_id
           ;");
 
-          foreach ($foci as $focus) {
-            $stat = (object)[];
-            $stat -> topic = $focus -> topic;
-            $stat -> focus = $focus -> focus_id; 
+          $problems = [];
+
+          // Group the attempts into arrays of problems
+          foreach ( $attempts as $attempt ) {
+            $problems[$attempt -> problem_id][] = $attempt;
           }
 
+          foreach ( $problems as $problem ) {
+            
+          
+          }
+          return $problems;
+
+          foreach ( $topics as $topic ) {
+            $stat = (object)[];
+            $foci = $wpdb -> get_results("
+              SELECT focus_id, topic, name
+              FROM ".getTable('pg_foci')."
+              WHERE topic = ".$topic -> topic_id."
+            ;");
+
+            $stat -> topic = $topic -> name;
+            $foci_stats = [];
+            foreach ( $foci as $focus ) {
+              $foci_stat = (object)[];
+              $foci_stat -> name = $focus -> name;
+              array_push($foci_stats, $foci_stat);
+            }
+            $stat -> foci = $foci_stats;
+            array_push($stats, $stat);
+          }
+
+          /*
           $stats = $wpdb->get_results("
             SELECT
               topic,
@@ -521,6 +550,7 @@ class Physics_Genie {
               AND ".(isset($json['focus']) ? 'focus = "'.$json['focus'].'"' : 'true')."
             ORDER BY topic, focus
           ;");
+          */
 
           return $stats;
         },
