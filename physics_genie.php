@@ -499,15 +499,6 @@ class Physics_Genie {
           $json = json_decode($request_data);
           global $wpdb;
 
-          /*
-          $attempts = $wpdb -> get_results("
-            SELECT *
-            FROM ".getTable('pg_user_attempts')."
-            WHERE user_id = ".get_current_user_id()."
-            ORDER BY date_attempted ASC, problem_id
-          ;");
-           */
-
           $topics = $wpdb -> get_results("
             SELECT topic_id, name 
             FROM ".getTable('pg_topics')."
@@ -550,7 +541,7 @@ class Physics_Genie {
           $attempts = $wpdb -> get_results("
             SELECT *
             FROM ".getTable('pg_user_attempts')."
-            WHERE user_id = 118 
+            WHERE user_id = ".get_current_user_id()."
             ORDER BY date_attempted ASC, problem_id
           ;");
 
