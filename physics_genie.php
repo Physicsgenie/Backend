@@ -485,14 +485,49 @@ class Physics_Genie {
           $json = json_decode($request_data);
           global $wpdb;
 
-          $stats = [];
+          /*
+          $attempts = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_user_attempts')."
+            WHERE user_id = ".get_current_user_id()."
+            ORDER BY date_attempted ASC, problem_id
+          ;");
+           */
 
           $topics = $wpdb -> get_results("
             SELECT topic_id, name 
             FROM ".getTable('pg_topics')."
           ;");
 
-          
+          // Create an object of topics and foci to calculate the stats
+          $blank_stats = array (
+            'num_presented' => 0,
+            'num_correct' => 0,
+            'num_attempts' => 0,
+            'xp' => 0,
+            'streak' => 0,
+            'longest_winstreak' => 0,
+            'longest_losestreak' => 0
+          );
+
+          $all_stats = $blank_stats;
+
+          foreach ( $topics as $topic ) {
+            $foci = $wpdb -> get_results("
+              SELECT focus_id, topic
+              FROM ".getTable('pg_foci')."
+              WHERE topic = ".$topic -> topic_id."
+            ;");
+
+
+            $all_stats['topic_stats'][$topic -> topic_id] = $blank_stats;
+            foreach ( $foci as $focus ) {
+              $all_stats['topic_stats'][$topic -> topic_id]['focus_stats'][$focus -> focus_id] = $blank_stats;
+            }
+          }
+
+          // Loop through and calculate stats
+
           $attempts = $wpdb -> get_results("
             SELECT *
             FROM ".getTable('pg_user_attempts')."
@@ -500,19 +535,61 @@ class Physics_Genie {
             ORDER BY date_attempted ASC, problem_id
           ;");
 
-          $problems = [];
-
           // Group the attempts into arrays of problems
+          $problems = [];
           foreach ( $attempts as $attempt ) {
             $problems[$attempt -> problem_id][] = $attempt;
           }
-
-          foreach ( $problems as $problem ) {
-            
           
-          }
           return $problems;
 
+          foreach ( $problems as $problem_id => $problem  ) {
+            $problem_info = $wpdb -> get_results("
+              SELECT main_focus, difficulty
+              FROM ".getTable('pg_problems')."
+              WHERE problem_id = ".$problem_id."
+            ;")[0];
+
+            $focus = $problem_info -> main_focus;
+
+            $topic = $wpdb -> get_results("
+              SELECT topic
+              FROM ".getTable('pg_foci')."
+              WHERE focus_id = ".$focus."
+            ;")[0] -> topic;
+
+            $correct = False;
+
+            // Loop through the problem attempts
+            for( $i = 0; $i < count($problem); $i++ ) {
+              if($problem[$i] -> correct === "1" && $i < 3)
+                $correct = True;
+              // Increase attempts
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_attempts'] ++;
+            }
+
+            // Increase presented problems
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_presented'] ++;
+
+            if( $correct ) {
+              if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] > 0 )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] ++;
+              elseif( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] < 0 )
+                 $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] = 1;
+
+              // Increment xp based on difficulty
+              $all_stats['topic_stats'][$topic]['focus_stats'][$problem_info -> main_focus]['xp'] += $problem_info -> difficulty * 2;
+              // Increase correct count
+              $all_stats['topic_stats'][$topic]['focus_stats'][$problem_info -> main_focus]['num_correct'] ++;
+            } else {
+            
+            }
+          }
+          
+          return $all_stats;
+
+          // Create the response object
+          $stats = [];
           foreach ( $topics as $topic ) {
             $stat = (object)[];
             $foci = $wpdb -> get_results("
