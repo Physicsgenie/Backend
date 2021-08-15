@@ -40,6 +40,13 @@ class Physics_Genie {
 
     // add_action('init', array($this, 'connect_another_db'));
 
+    // Create custom shortcodes
+    add_shortcode('contact_form', function() {
+
+      return $this->get_template_html('contact_form');
+
+    });
+
     // Registers API routes
     add_action('rest_api_init', function(){
       // Registers the path /physics_genie/git-deploy-backend to update the plugin
@@ -182,6 +189,30 @@ class Physics_Genie {
 
 
     });
+  }
+
+  // Load a template file for a custom page or shortcode
+  private function get_template_html($template_name, $attributes = null) {
+    // If $attributes is null set it to an empty array
+    if (!$attributes) {
+      $attributes = array();
+    }
+
+    ob_start();
+
+    // Create an action that gets called before template is loaded for possible hooks
+    do_action('physics_genie_before_'.$template_name);
+
+    // Require template
+    require('templates/'.$template_name.'.php');
+
+    // Create an action that gets called after template is loaded for possible hooks
+    do_action('physics_genie_after_'.$template_name);
+
+    $html = ob_get_contents();
+    ob_end_clean();
+
+    return $html;
   }
 
   // public static function connect_another_db() {
