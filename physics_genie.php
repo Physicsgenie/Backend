@@ -689,7 +689,7 @@ class Physics_Genie {
 
               // Set the focus longest losestreak
               $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'] = 
-                -min(
+                min(
                   $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'],
                   $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
                 );
@@ -703,7 +703,7 @@ class Physics_Genie {
 
               // Set the topic longest losestreak
               $all_stats['topic_stats'][$topic]['longest_losestreak'] =
-                -min(
+                min(
                   $all_stats['topic_stats'][$topic]['longest_losestreak'],
                   $all_stats['topic_stats'][$topic]['streak'],
                 );
@@ -717,7 +717,7 @@ class Physics_Genie {
 
               // Set the overall longest losestreak
               $all_stats['longest_losestreak'] = 
-                -min(
+                min(
                   $all_stats['longest_losestreak'],
                   $all_stats['streak'],
                 );
@@ -755,15 +755,20 @@ class Physics_Genie {
                 WHERE focus_id = ".$focus_id."
                 ;")[0] -> name;
 
+              $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
+
               $focus_stats[$focus_name] = $focus_stat;
             }
 
             $topic_stat['focus_stats'] = $focus_stats;
+            $topic_stat['longest_losestreak'] = - $topic_stat['longest_losestreak'];
             $topic_stats[$topic_name] = $topic_stat;
 
           }
 
           $all_stats['topic_stats'] = $topic_stats;
+          $all_stats['longest_losestreak'] = - $all_stats['longest_losestreak'];
+
 
           return json_encode($all_stats);
         },
