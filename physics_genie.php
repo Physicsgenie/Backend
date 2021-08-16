@@ -689,7 +689,7 @@ class Physics_Genie {
 
               // Set the focus longest losestreak
               $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'] = 
-                min(
+                -min(
                   $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'],
                   $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
                 );
@@ -703,7 +703,7 @@ class Physics_Genie {
 
               // Set the topic longest losestreak
               $all_stats['topic_stats'][$topic]['longest_losestreak'] =
-                min(
+                -min(
                   $all_stats['topic_stats'][$topic]['longest_losestreak'],
                   $all_stats['topic_stats'][$topic]['streak'],
                 );
@@ -717,7 +717,7 @@ class Physics_Genie {
 
               // Set the overall longest losestreak
               $all_stats['longest_losestreak'] = 
-                max(
+                -min(
                   $all_stats['longest_losestreak'],
                   $all_stats['streak'],
                 );
