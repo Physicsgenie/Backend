@@ -631,10 +631,16 @@ class Physics_Genie {
                 $all_stats['topic_stats'][$topic]['num_correct'] ++;
                 $all_stats['num_correct'] ++;
 
-                // Increment xp based on difficulty
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $problem_info -> difficulty * 2;
-                $all_stats['topic_stats'][$topic]['xp'] += $problem_info -> difficulty * 2;
-                $all_stats['xp'] += $problem_info -> difficulty * 2;
+                // Increment xp based on difficulty and streak
+                // 15% bonus if xp is streak is a multiple of 5
+                $base_xp = $problem_info -> difficulty * ( 4 - count($problem) );
+                if( 
+                  intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) > 0 &&
+                  intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) % 5 == 0
+                )
+                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp * 1.15;
+                else
+                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp;
 
                 // Set the focus streak stats
                 if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] >= 0 )
@@ -739,7 +745,9 @@ class Physics_Genie {
           }
 
           // Convert topic and focus ids to names
+          // Invert losestreak and sum xp
           $topic_stats = [];
+          $total_xp = 0;
           foreach ( $all_stats['topic_stats'] as $topic_id => $topic_stat ){
             $topic_name = $wpdb -> get_results("
               SELECT name
@@ -748,6 +756,7 @@ class Physics_Genie {
               ;")[0] -> name;
 
             $focus_stats = [];
+            $topic_xp = 0;
             foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
               $focus_name = $wpdb -> get_results("
                 SELECT name
@@ -756,19 +765,21 @@ class Physics_Genie {
                 ;")[0] -> name;
 
               $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
+              $topic_xp += $focus_stat['xp'];
 
               $focus_stats[$focus_name] = $focus_stat;
             }
 
+            $total_xp += $topic_xp;
             $topic_stat['focus_stats'] = $focus_stats;
             $topic_stat['longest_losestreak'] = - $topic_stat['longest_losestreak'];
+            $topic_stat['xp'] = $topic_xp;
             $topic_stats[$topic_name] = $topic_stat;
-
           }
 
           $all_stats['topic_stats'] = $topic_stats;
+          $all_stats['xp'] = $total_xp;
           $all_stats['longest_losestreak'] = - $all_stats['longest_losestreak'];
-
 
           return json_encode($all_stats);
         },
