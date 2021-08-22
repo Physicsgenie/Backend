@@ -24,7 +24,6 @@ function getTable($tab) {
 
 class Physics_Genie {
 
-
   public function __construct() {
 
     // add_action('init', array($this, 'connect_another_db'));
@@ -161,6 +160,44 @@ class Physics_Genie {
         }
       }
 
+      // Returns a focus name from the id
+      function getFocusName($id){
+        global $wpdb;
+        return $wpdb -> get_results("
+          SELECT name
+          FROM ".getTable('pg_foci')."
+          WHERE focus_id = ".$id."
+        ;")[0] -> name;
+      }
+
+      function getFocusNames($ids){
+        // Convert other_foci to names
+        $other_foci_names = [];
+        foreach( $ids as $id ) {
+          array_push($other_foci_names, getFocusName($id));
+        }
+        return $other_foci_names; 
+      }
+
+      // Returns a focus name from the id
+      function getTopicName($id){
+        global $wpdb;
+        return $wpdb -> get_results("
+          SELECT name
+          FROM ".getTable('pg_topics')."
+          WHERE topic_id = ".$id."
+        ;")[0] -> name;
+      }
+
+      function getTopicNames($ids){
+        // Convert other_foci to names
+        $other_topic_names = [];
+        foreach( $ids as $id ) {
+          array_push($other_topic_names, getTopicName($id));
+        }
+        return $other_topic_names; 
+      }
+
       // Test functions endpoint
       if($GLOBALS['DEBUG']){
         register_rest_route('physics_genie', 'test', array(
@@ -168,7 +205,7 @@ class Physics_Genie {
           'callback' => function($request){
               // Update main_focus in pg_problems
               // updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
-            convertAttempts('pg_user_problems', 'pg_user_attempts');
+            //convertAttempts('pg_user_problems', 'pg_user_attempts');
          },
           'permission_callback' => '__return_true'
         ));
@@ -192,7 +229,7 @@ class Physics_Genie {
         'callback' => function() {
           $data = (object)[];
 
-          $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
+          $data -> contributor = current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor');
 
           return json_encode($data);
         },
@@ -233,7 +270,12 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
 
-          if ($wpdb->get_results("SELECT curr_problem FROM ".getTable('pg_users')." WHERE user_id = ".get_current_user_id().";")[0]->curr_problem === null) {
+          // Find a new problem if the user does not have a current problem
+          if ( $wpdb -> get_results("
+              SELECT curr_problem
+              FROM ".getTable('pg_users')."
+              WHERE user_id = ".get_current_user_id()."
+            ;")[0] -> curr_problem === null) {
 
             $foci = $wpdb -> get_results("
               SELECT curr_foci
@@ -268,15 +310,15 @@ class Physics_Genie {
               LIMIT 1
               ;");
 
-            if (count($problem) == 0) {
+            if (count($problem) == 0)
               return null;
-            } else {
+            else {
               $problem = $problem[0];
-
-              $wpdb->update(
+              // Set the current problem to the new problem
+              $wpdb -> update(
                 getTable('pg_users'),
                 array(
-                  'curr_problem' => $problem->problem_id
+                  'curr_problem' => $problem -> problem_id
                 ),
                 array(
                   'user_id' => get_current_user_id()
@@ -284,36 +326,28 @@ class Physics_Genie {
                 null,
                 array('%d')
               );
-
-              $problem -> other_foci = unserialize($problem -> other_foci);
-              $problem -> topic = $wpdb -> get_results("
-                SELECT topic
-                FROM ".getTable("pg_foci")."
-                WHERE focus_id = ".($problem -> main_focus)."
-              ;")[0] -> topic;
-
-            $foci = $wpdb -> get_results("
-              SELECT curr_foci
-              FROM wordpress.".getTable('pg_users')."
-              WHERE user_id = ".get_current_user_id()."
-            ;")[0] -> curr_foci;
-              return new WP_REST_RESPONSE($problem);
             }
-
           } else {
+            // Return the current problem if it exists
             $problem = $wpdb->get_results("
               SELECT * FROM ".getTable('pg_problems')."
               WHERE problem_id = (SELECT curr_problem FROM ".getTable('pg_users')."
               WHERE user_id  = ".get_current_user_id().")
             ;")[0];
-            $problem -> other_foci = unserialize($problem -> other_foci);
-            $problem -> topic = $wpdb -> get_results("
-              SELECT topic
-              FROM ".getTable("pg_foci")."
-              WHERE focus_id = ".($problem -> main_focus)."
-            ;")[0] -> topic;
-            return json_encode($problem);
           }
+
+          // Convert other_foci to names
+          $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
+
+          // Convert topic and main_focus to names
+          $problem -> topic = getTopicName( $wpdb -> get_results("
+            SELECT topic
+            FROM ".getTable("pg_foci")."
+            WHERE focus_id = ".($problem -> main_focus)."
+          ;")[0] -> topic );
+          $problem -> main_focus = getFocusName( $problem -> main_focus );
+
+          return json_encode($problem);
         },
         'permission_callback' => '__return_true'
       ));
@@ -350,15 +384,22 @@ class Physics_Genie {
         'callback' => function($data) {
           global $wpdb;
 
-          $problem = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE ".getTable('pg_problems').".problem_id = ".$data['problem'].";")[0];
+          $problem = $wpdb->get_results("
+            SELECT *
+            FROM ".getTable('pg_problems')."
+            WHERE ".getTable('pg_problems').".problem_id = ".$data['problem']."
+          ;")[0];
 
-          $problem -> topic = $wpdb -> get_results("
+          // Convert other_foci to names
+          $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
+
+          // Convert topic and main_focus to names
+          $problem -> topic = getTopicName( $wpdb -> get_results("
             SELECT topic
             FROM ".getTable("pg_foci")."
             WHERE focus_id = ".($problem -> main_focus)."
-          ;")[0] -> topic;
-
-          $problem -> other_foci = unserialize($problem -> other_foci);
+          ;")[0] -> topic );
+          $problem -> main_focus = getFocusName( $problem -> main_focus );
 
           return json_encode($problem);
         },
@@ -381,15 +422,33 @@ class Physics_Genie {
         'callback' => function() {
           global $wpdb;
 
-          $problems = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." WHERE submitter = ".(get_current_user_id())." ORDER BY problem_id DESC;");
+          $problems = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_problems')."
+            WHERE submitter = ".(get_current_user_id())."
+            ORDER BY problem_id DESC
+          ;");
 
           if (get_current_user_id() === 1 || get_current_user_id() === 6 || get_current_user_id() === 16) {
-            $problems = $wpdb->get_results("SELECT * FROM ".getTable('pg_problems')." ORDER BY problem_id DESC;");
+            $problems = $wpdb -> get_results("
+              SELECT *
+              FROM ".getTable('pg_problems')."
+              ORDER BY problem_id DESC
+            ;");
           }
 
-          foreach( $problems as $problem )
-            $problem -> other_foci = unserialize($problem -> other_foci);
+          foreach( $problems as $problem ){
+            // Convert other_foci to names
+            $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
 
+            // Convert topic and main_focus to names
+            $problem -> topic = getTopicName( $wpdb -> get_results("
+              SELECT topic
+              FROM ".getTable("pg_foci")."
+              WHERE focus_id = ".($problem -> main_focus)."
+            ;")[0] -> topic );
+            $problem -> main_focus = getFocusName( $problem -> main_focus );
+          }
           return json_encode($problems);
         },
         'permission_callback' => '__return_true'
@@ -464,9 +523,11 @@ class Physics_Genie {
             WHERE user_id = ".get_current_user_id()."
           ;")[0];
 
-          $data -> setup -> curr_topics = unserialize($data -> setup -> curr_topics);
+          // Convert curr_topics to names
+          $data -> setup -> curr_topics = getTopicNames( unserialize( $data -> setup -> curr_topics ) );
 
-          $data -> setup -> curr_foci = unserialize($data -> setup -> curr_foci);
+          // Convert curr_foci to names
+          $data -> setup -> curr_foci = getFocusNames( unserialize( $data -> setup -> curr_foci ) );
 
           return json_encode($data);
         },
@@ -495,8 +556,7 @@ class Physics_Genie {
        */
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
-        'callback' => function($request_data) {
-          $json = json_decode($request_data);
+        'callback' => function() {
           global $wpdb;
 
           $topics = $wpdb -> get_results("
@@ -536,8 +596,7 @@ class Physics_Genie {
             }
           }
 
-          // Loop through and calculate stats
-
+          // Get attempts
           $attempts = $wpdb -> get_results("
             SELECT *
             FROM ".getTable('pg_user_attempts')."
@@ -556,6 +615,7 @@ class Physics_Genie {
             return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
           });
 
+          // Loop through and calculate stats
           foreach ( $problems as $problem_id => $problem  ) {
             $problem_info = $wpdb -> get_results("
               SELECT main_focus, difficulty
@@ -631,7 +691,7 @@ class Physics_Genie {
                 $all_stats['topic_stats'][$topic]['num_correct'] ++;
                 $all_stats['num_correct'] ++;
 
-                // Increment xp based on difficulty and streak
+                // Increment focus xp based on difficulty and streak (topic and overall xp is adedd)
                 // 15% bonus if xp is streak is a multiple of 5
                 $base_xp = $problem_info -> difficulty * ( 4 - count($problem) );
                 if( 
@@ -683,7 +743,6 @@ class Physics_Genie {
                   $all_stats['streak'] --;
                 elseif( $all_stats['streak'] > 0 )
                   $all_stats['streak'] = -1;
-
              }
 
               // Set the focus longest winstreak
@@ -741,7 +800,6 @@ class Physics_Genie {
                 $all_stats['completed_attempts']/
                 $all_stats['num_completed'];
             }
-
           }
 
           // Convert topic and focus ids to names
@@ -749,21 +807,12 @@ class Physics_Genie {
           $topic_stats = [];
           $total_xp = 0;
           foreach ( $all_stats['topic_stats'] as $topic_id => $topic_stat ){
-            $topic_name = $wpdb -> get_results("
-              SELECT name
-              FROM ".getTable('pg_topics')."
-              WHERE topic_id = ".$topic_id."
-              ;")[0] -> name;
-
+            $topic_name = getTopicName($topic_id);
             $focus_stats = [];
             $topic_xp = 0;
-            foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
-              $focus_name = $wpdb -> get_results("
-                SELECT name
-                FROM ".getTable('pg_foci')."
-                WHERE focus_id = ".$focus_id."
-                ;")[0] -> name;
 
+            foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
+              $focus_name = getFocusName($focus_id);
               $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
               $topic_xp += $focus_stat['xp'];
 
@@ -818,11 +867,11 @@ class Physics_Genie {
           $user_id = wp_insert_user( $user_data );
 
           if (is_wp_error($user_id)) {
-            return json_encode($user_id->get_error_messages());
+            return json_encode($user_id -> get_error_messages());
           }
 
           global $wpdb;
-          $wpdb->insert(
+          $wpdb -> insert(
             getTable('pg_users'),
             array(
               'user_id' => $user_id,
@@ -837,25 +886,6 @@ class Physics_Genie {
               'calculus' => 1,
             )
           );
-
-          foreach ($wpdb->get_results("SELECT topic, focus FROM ".getTable('pg_topics').";") as $focus) {
-            $wpdb->insert(
-              getTable('pg_user_stats'),
-              array(
-                'user_id' => $user_id,
-                'topic' => $focus->topic,
-                'focus' => $focus->focus,
-                'num_presented' => 0,
-                'num_saved' => 0,
-                'num_correct' => 0,
-                'avg_attempts' => 0,
-                'xp' => 0,
-                'streak' => 0,
-                'longest_winstreak' => 0,
-                'longest_losestreak' => 0
-              )
-            );
-          }
 
           return json_encode([]);
         },
@@ -879,8 +909,8 @@ class Physics_Genie {
           $json = json_decode($request_data);
           $user_data = get_user_by('email', $json["email"]);
 
-          $user_login = $user_data->user_login;
-          $user_email = $user_data->user_email;
+          $user_login = $user_data -> user_login;
+          $user_email = $user_data -> user_email;
           $key = get_password_reset_key( $user_data );
 
 
@@ -968,7 +998,7 @@ class Physics_Genie {
           $json = json_decode($request_data);
 
           global $wpdb;
-          $wpdb->insert(
+          $wpdb -> insert(
             getTable('pg_problems'),
             array(
               'problem_text' => $json['problem_text'],
@@ -992,7 +1022,7 @@ class Physics_Genie {
             )
           );
 
-          return $wpdb->insert_id;
+          return $wpdb -> insert_id;
         },
         'permission_callback' => '__return_true'
       ));
@@ -1017,7 +1047,7 @@ class Physics_Genie {
 
           global $wpdb;
 
-          $wpdb->insert(getTable('pg_sources'),
+          $wpdb -> insert(getTable('pg_sources'),
             array(
               'category' => $json['category'],
               'author' => $json['author'],
@@ -1025,7 +1055,7 @@ class Physics_Genie {
             )
           );
 
-          return $wpdb->insert_id;
+          return $wpdb -> insert_id;
         },
         'permission_callback' => '__return_true'
       ));
@@ -1053,7 +1083,7 @@ class Physics_Genie {
           global $wpdb;
 
 
-          $wpdb->insert(
+          $wpdb -> insert(
             getTable('pg_user_problems'),
             array(
               'user_id' => get_current_user_id(),
@@ -1065,7 +1095,7 @@ class Physics_Genie {
             )
           );
 
-          $wpdb->update(
+          $wpdb -> update(
             getTable('pg_users'),
             array(
               'curr_problem' => null
@@ -1076,87 +1106,6 @@ class Physics_Genie {
             null,
             array('%d')
           );
-
-          //Focus stats
-          $curr_focus_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$json['topic']."' AND focus = '".$json['focus']."';")[0];
-
-          $focus_xp = $curr_focus_stats->xp;
-          $focus_streak = $curr_focus_stats->streak;
-          if ($json['correct'] === 'true' && $focus_streak > 0 && ($focus_streak + 1) % 5 === 0) {
-            $focus_xp = intval(1.15*($curr_focus_stats->xp+intval($json['difficulty'])*(4-intval($json['num_attempts']))));
-          } else if ($json['correct'] === 'true') {
-            $focus_xp = $curr_focus_stats->xp+intval($json['difficulty'])*(4-intval($json['num_attempts']));
-          } else if (!($json['correct'] === 'true') && $focus_streak < 0 && ($focus_streak - 1) % 3 === 0) {
-            $focus_xp = intval(0.85*$curr_focus_stats->xp);
-          }
-
-          $wpdb->update(
-            getTable('pg_user_stats'),
-            array(
-              'num_presented' => $curr_focus_stats->num_presented + 1,
-              'num_correct' => $curr_focus_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_focus_stats->avg_attempts * $curr_focus_stats->num_presented + intval($json['num_attempts']))/($curr_focus_stats->num_presented + 1),
-              'xp' => $focus_xp,
-              'streak' => ($json['correct'] === 'true' ? ($focus_streak > 0 ? $focus_streak + 1 : 1) : ($focus_streak > 0 ? -1 : $focus_streak - 1)),
-              'longest_winstreak' => (($json['correct'] === 'true' && $focus_streak >= $curr_focus_stats->longest_winstreak) ? ($focus_streak + 1) : ($json['correct'] === 'true' && $curr_focus_stats->longest_winstreak === 0 ? 1 : $curr_focus_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$focus_streak >= $curr_focus_stats->longest_losestreak) ? (1 - $focus_streak) : (!($json['correct'] === 'true') && $curr_focus_stats->longest_losestreak == 0 ? 1 : $curr_focus_stats->longest_losestreak))
-            ),
-            array(
-              'user_id' => get_current_user_id(),
-              'topic' => $json['topic'],
-              'focus' => $json['focus']
-            ),
-            null,
-            array('%d', '%s', '%s')
-          );
-
-          //Topic stats
-          $curr_topic_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = '".$json['topic']."' AND focus = 'z';")[0];
-
-          $wpdb->update(
-            getTable('pg_user_stats'),
-            array(
-              'num_presented' => $curr_topic_stats->num_presented + 1,
-              'num_correct' => $curr_topic_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_topic_stats->avg_attempts * $curr_topic_stats->num_presented + intval($json['num_attempts']))/($curr_topic_stats->num_presented + 1),
-              'xp' => $curr_topic_stats->xp-$curr_focus_stats->xp+$focus_xp,
-              'streak' => ($json['correct'] === 'true' ? ($curr_topic_stats->streak > 0 ? $curr_topic_stats->streak + 1 : 1) : ($curr_topic_stats->streak > 0 ? -1 : $curr_topic_stats->streak - 1)),
-              'longest_winstreak' => (($json['correct'] === 'true' && $curr_topic_stats->streak >= $curr_topic_stats->longest_winstreak) ? ($curr_topic_stats->streak + 1) : ($json['correct'] === 'true' && $curr_topic_stats->longest_winstreak === 0 ? 1 : $curr_topic_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$curr_topic_stats->streak >= $curr_topic_stats->longest_losestreak) ? (1 - $curr_topic_stats->streak) : (!($json['correct'] === 'true') && $curr_topic_stats->longest_losestreak == 0 ? 1 : $curr_topic_stats->longest_losestreak))
-            ),
-            array(
-              'user_id' => get_current_user_id(),
-              'topic' => $json['topic'],
-              'focus' => 'z'
-            ),
-            null,
-            array('%d', '%s', '%s')
-          );
-
-          //User stats
-          $curr_user_stats = $wpdb->get_results("SELECT * FROM ".getTable('pg_user_stats')." WHERE user_id = ".get_current_user_id()." AND topic = 'z' AND focus = 'z';")[0];
-
-          $wpdb->update(
-            getTable('pg_user_stats'),
-            array(
-              'num_presented' => $curr_user_stats->num_presented + 1,
-              'num_correct' => $curr_user_stats->num_correct + ($json['correct'] === 'true' ? 1 : 0),
-              'avg_attempts' => ($curr_user_stats->avg_attempts * $curr_user_stats->num_presented + intval($json['num_attempts']))/($curr_user_stats->num_presented + 1),
-              'xp' => $curr_user_stats->xp-$curr_focus_stats->xp+$focus_xp,
-              'streak' => ($json['correct'] === 'true' ? ($curr_user_stats->streak > 0 ? $curr_user_stats->streak + 1 : 1) : ($curr_user_stats->streak > 0 ? -1 : $curr_user_stats->streak - 1)),
-              'longest_winstreak' => (($json['correct'] === 'true' && $curr_user_stats->streak >= $curr_user_stats->longest_winstreak) ? ($curr_user_stats->streak + 1) : ($json['correct'] === 'true' && $curr_user_stats->longest_winstreak === 0 ? 1 : $curr_user_stats->longest_winstreak)),
-              'longest_losestreak' => ((!($json['correct'] === 'true') && -1*$curr_user_stats->streak >= $curr_user_stats->longest_losestreak) ? (1 - $curr_user_stats->streak) : (!($json['correct'] === 'true') && $curr_user_stats->longest_losestreak == 0 ? 1 : $curr_user_stats->longest_losestreak))
-            ),
-            array(
-              'user_id' => get_current_user_id(),
-              'topic' => 'z',
-              'focus' => 'z'
-            ),
-            null,
-            array('%d', '%s', '%s')
-          );
-
-          return 1;
         },
         'permission_callback' => '__return_true'
 
@@ -1202,7 +1151,7 @@ class Physics_Genie {
         'methods' => 'PUT',
         'callback' => function() {
           global $wpdb;
-          return $wpdb->update(
+          return $wpdb -> update(
             getTable('pg_users'),
             array(
               'curr_problem' => null,
@@ -1236,7 +1185,7 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data);
           global $wpdb;
-          return $wpdb->update('wp_users', array(
+          return $wpdb -> update('wp_users', array(
             'user_login' => $json['name'],
             'user_nicename' => $json['name']
           ), array(
@@ -1311,7 +1260,7 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data);
           global $wpdb;
-          return $wpdb->update(getTable('pg_problems'), array(
+          return $wpdb -> update(getTable('pg_problems'), array(
             'problem_text' => $json['problem_text'],
             'diagram' => ($json['diagram'] === "" ? null : $json['diagram']),
             'answer' => $json['answer'],
