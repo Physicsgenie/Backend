@@ -49,7 +49,10 @@ class Physics_Genie {
         'callback' => function() {
           $data = (object)[];
 
-          $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
+          $data -> contributor =
+            current_user_can('administrator') ||
+            current_user_can('editor') || 
+            current_user_can('contributor');
 
           return $data;
         },
@@ -78,14 +81,15 @@ class Physics_Genie {
             ),
             array(
               $index => $row -> $index
-            )
+            ),
+            null,
+            array('%d')
           );
         }
-
       }
 
       // Replace foci string with serialized array
-      function serializeColumn($table, $newTable, $index, $column) {
+      function serializeFoci($table, $newTable, $index, $column) {
         global $wpdb;
         $rows = $wpdb -> get_results(
           "SELECT ".$index.", ".$column."
@@ -98,11 +102,11 @@ class Physics_Genie {
           $chars = str_split($str);
           foreach ( $chars as $char ) {
             $focus_id = $wpdb -> get_results("
-              SELECT topics_id
+              SELECT focus
               FROM wordpress.".getTable('pg_topics_old')."
               WHERE focus = '".$char."'
-            ;")[0] -> topics_id;
-            array_push($foci, $focus_id);
+            ;")[0] -> focus;
+            array_push($foci, intval($focus_id));
           }
 
           $wpdb -> update(
@@ -117,6 +121,30 @@ class Physics_Genie {
         }
       }
 
+      // Replace foci string with serialized array
+      function serializeTopics($table, $newTable, $index, $column) {
+        global $wpdb;
+        $rows = $wpdb -> get_results(
+          "SELECT ".$index.", ".$column."
+          FROM wordpress.".getTable($table).";"
+        );
+
+        $topics = array( 1 );
+
+        foreach ( $rows as $row ) {
+          $wpdb -> update(
+            getTable($newTable),
+            array(
+              $column => serialize($topics)
+            ),
+            array(
+              $index => $row -> $index
+            )
+          );
+        }
+      }
+
+      // Convert existing problems to attempts
       function convertAttempts($table, $newTable){
         global $wpdb;
         $problems = $wpdb -> get_results("
@@ -144,6 +172,7 @@ class Physics_Genie {
               )
             );
           }
+
           if( $attempts == 0 ){
             $wpdb -> insert(
               getTable($newTable),
@@ -166,17 +195,36 @@ class Physics_Genie {
         return $wpdb -> get_results("
           SELECT name
           FROM ".getTable('pg_foci')."
-          WHERE focus_id = ".$id."
+          WHERE focus_id = ".intval($id)."
         ;")[0] -> name;
       }
 
+      // Convert an array of foci to names
       function getFocusNames($ids){
-        // Convert other_foci to names
-        $other_foci_names = [];
+        $focus_names = [];
         foreach( $ids as $id ) {
-          array_push($other_foci_names, getFocusName($id));
+          array_push($focus_names, getFocusName($id));
         }
-        return $other_foci_names; 
+        return $focus_names;
+      }
+
+      // Returns the id of a focus from the name
+      function getFocusId($name){
+        global $wpdb;
+        return intval($wpdb -> get_results("
+          SELECT focus_id
+          FROM ".getTable('pg_foci')."
+          WHERE name = '".$name."'
+        ;")[0] -> focus_id);
+      }
+
+      // Convert an array of foci names to ids
+      function getFocusIds($names){
+        $focus_ids = [];
+        foreach( $names as $name ) {
+          array_push($focus_ids, getFocusId($name));
+        }
+        return $focus_ids; 
       }
 
       // Returns a focus name from the id
@@ -185,21 +233,42 @@ class Physics_Genie {
         return $wpdb -> get_results("
           SELECT name
           FROM ".getTable('pg_topics')."
-          WHERE topic_id = ".$id."
+          WHERE topic_id = ".intval($id)."
         ;")[0] -> name;
       }
 
+      // Convert an array of topics to names;
       function getTopicNames($ids){
-        // Convert other_foci to names
-        $other_topic_names = [];
+        $topic_names = [];
         foreach( $ids as $id ) {
-          array_push($other_topic_names, getTopicName($id));
+          array_push($topic_names, getTopicName($id));
         }
-        return $other_topic_names; 
+        return $topic_names; 
+      }
+
+      // Returns the id of a focus from the name
+      function getTopicId($name){
+        global $wpdb;
+        return intval($wpdb -> get_results("
+          SELECT topic_id
+          FROM ".getTable('pg_topics')."
+          WHERE name = '".$name."'
+        ;")[0] -> topic_id);
+      }
+
+      // Convert an array of foci names to ids
+      function getTopicIds($names){
+        $topic_ids = [];
+        foreach( $names as $name ) {
+          array_push($topic_ids, getTopicId($name));
+        }
+        return $topic_ids; 
       }
 
       // Test functions endpoint
       if($GLOBALS['DEBUG']){
+        global $wpdb;
+        $wpdb -> show_errors();
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
           'callback' => function($request){
@@ -291,7 +360,7 @@ class Physics_Genie {
               WHERE user_id = ".get_current_user_id()."
             ;")[0] -> curr_diff;
 
-            $problem = $wpdb->get_results("
+            $problem = $wpdb -> get_results("
               SELECT *
               FROM wordpress.".getTable('pg_problems')."
               WHERE
@@ -303,8 +372,8 @@ class Physics_Genie {
                     FROM wordpress.".getTable('pg_users')."
                     WHERE user_id = ".get_current_user_id()."), TRUE, calculus != 'Required')
                 AND problem_id NOT IN
-                  (SELECT problem_id
-                   FROM wordpress.".getTable('pg_user_problems')."
+                  (SELECT DISTINCT problem_id
+                   FROM wordpress.".getTable('pg_user_attempts')."
                    WHERE user_id = ".get_current_user_id().")
               ORDER BY RAND()
               LIMIT 1
@@ -440,7 +509,6 @@ class Physics_Genie {
           foreach( $problems as $problem ){
             // Convert other_foci to names
             $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
-
             // Convert topic and main_focus to names
             $problem -> topic = getTopicName( $wpdb -> get_results("
               SELECT topic
@@ -854,11 +922,11 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'register', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
           $user_data = array(
-            'user_login'    => $json["username"],
-            'user_email'    => $json["email"],
-            'user_pass'     => $json["password"],
+            'user_login'    => $json -> username,
+            'user_email'    => $json -> email,
+            'user_pass'     => $json -> password,
             'first_name'    => "",
             'last_name'     => "",
             'nickname'      => "",
@@ -876,11 +944,15 @@ class Physics_Genie {
             array(
               'user_id' => $user_id,
               'curr_diff' => 1,
-              'curr_topics' => "0",
+              'curr_topics' => serialize(
+                array(
+                  1
+                )
+              ),
               'curr_foci' => serialize(
                 array(
+                  8,
                   9,
-                  10,
                 )
               ),
               'calculus' => 1,
@@ -906,13 +978,12 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'password-reset', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
-          $user_data = get_user_by('email', $json["email"]);
+          $json = json_decode($request_data -> get_body());
+          $user_data = get_user_by('email', $json -> email);
 
           $user_login = $user_data -> user_login;
           $user_email = $user_data -> user_email;
           $key = get_password_reset_key( $user_data );
-
 
           $message = __('Someone requested that the password be reset for the following account:') . "\r\n\r\n";
           $message .= network_home_url( '/' ) . "\r\n\r\n";
@@ -948,18 +1019,18 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data -> get_body());
           global $wpdb;
-          $wpdb->insert(
+          $wpdb -> insert(
             getTable('pg_problem_errors'),
             array(
               'user_id' => get_current_user_id(),
               'problem_id' => $json -> problem_id,
-              'error_location' => ($json -> error_location === "" ? null : $json -> error_location),
-              'error_type' => ($json -> error_type === "" ? null : $json -> error_type),
-              'error_message' => ($json -> error_message === "" ? null : $json -> error_message),
+              'error_location' => $json -> error_location,
+              'error_type' => $json -> error_type,
+              'error_message' => $json -> error_message,
             )
           );
 
-          return $wpdb->insert_id;
+          return $wpdb -> insert_id;
         },
         'permission_callback' => '__return_true'
       ));
@@ -995,29 +1066,34 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'submit-problem', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
+
+          // Convert other_foci to a serialized integer array
+          if( $json -> other_foci === null )
+            $other_foci = null;
+          else
+            $other_foci = serialize(getFocusIds($json -> other_foci));
 
           global $wpdb;
           $wpdb -> insert(
             getTable('pg_problems'),
             array(
-              'problem_text' => $json['problem_text'],
-              'diagram' => ($json['diagram'] === "" ? null : $json['diagram']),
-              'answer' => $json['answer'],
-              'must_match' => ($json['must_match'] === 'true' ? 1 : 0),
-              'error' => floatval($json['error']),
-              'solution' => $json['solution'],
-              'solution_diagram' => ($json['solution_diagram'] === "" ? null : $json['solution_diagram']),
-              'hint_one' => $json['hint_one'],
-              'hint_two' => ($json['hint_two'] === "" ? null : $json['hint_two']),
-              'source' => intval($json['source']),
-              'number_in_source' => $json['number_in_source'],
+              'problem_text' => $json -> problem_text,
+              'diagram' => $json -> diagram,
+              'answer' => $json -> answer,
+              'must_match' => $json -> must_match,
+              'error' => floatval($json -> error),
+              'solution' => $json -> solution,
+              'solution_diagram' => $json -> solution_diagram,
+              'hint_one' => $json -> hint_one,
+              'hint_two' => $json -> hint_two,
+              'source' => intval($json -> source),
+              'number_in_source' => $json -> number_in_source,
               'submitter' => get_current_user_id(),
-              'difficulty' => intval($json['difficulty']),
-              'calculus' => $json['calculus'],
-              'topic' => $json['topic'],
-              'main_focus' => $json['main_focus'],
-              'other_foci' => ($json['other_foci'] === "" ? null: serialize($json['other_foci'])),
+              'difficulty' => intval($json -> difficulty),
+              'calculus' => $json -> calculus,
+              'main_focus' => getFocusId($json -> main_focus),
+              'other_foci' => $other_foci,
               'date_added' => date('Y-m-d')
             )
           );
@@ -1043,15 +1119,15 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'add-source', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
 
           global $wpdb;
 
           $wpdb -> insert(getTable('pg_sources'),
             array(
-              'category' => $json['category'],
-              'author' => $json['author'],
-              'source' => $json['source']
+              'category' => $json -> category,
+              'author' => $json -> author,
+              'source' => $json -> source
             )
           );
 
@@ -1070,27 +1146,26 @@ class Physics_Genie {
        * @apiHeader {String} Authorization "Bearer " + user's current JSON Web Token (JWT).
        *
        * @apiParam {String} problem_id Id of attempted problem.
-       * @apiParam {String} num_attempts Number of attempts on problem.
+       * @apiParam {String} student_answer The student's answer for the attempt
        * @apiParam {String} correct Whether or not the problem was correct ("true" if correct, "false" otherwise).
-       * @apiParam {String} difficulty Difficulty of attempted problem (1-5).
        *
-       * @apiSuccess {Number} data Returns 1 on success.
+       * @apiSuccess {Number} complete Returns true if the attempt is correct or is the final attempt.
+       * @apiSuccess {Boolean} correct Returns true if the attempt is correct
        */
       register_rest_route('physics_genie', 'submit-attempt', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
           global $wpdb;
 
-
           $wpdb -> insert(
-            getTable('pg_user_problems'),
+            getTable('pg_user_attempts'),
             array(
               'user_id' => get_current_user_id(),
-              'problem_id' => intval($json['problem_id']),
-              'num_attempts' => intval($json['num_attempts']),
-              'correct' => ($json['correct'] === 'true' ? true : false),
-              'saved' => false,
+              'problem_id' => $json -> problem_id,
+              'student_answer' => $json -> student_answer,
+              'correct' => $json -> correct,
+              'give_up' => $json -> give_up,
               'date_attempted' => date('Y-m-d H:i:s')
             )
           );
@@ -1106,6 +1181,27 @@ class Physics_Genie {
             null,
             array('%d')
           );
+
+          $response = (object)[];
+
+          $response -> complete = FALSE;
+
+          if( $json -> correct === TRUE )
+            $response -> complete = TRUE;
+
+          $attempts = $wpdb -> get_results("
+            SELECT COUNT(user_attempt_id)
+            FROM wordpress.".getTable('pg_user_attempts')."
+            WHERE user_id = ".get_current_user_id()."
+              AND problem_id = ".$json -> problem_id."
+          ;")[0] -> {'COUNT(user_attempt_id)'};
+
+          if( $attempts >= 3 )
+            $response -> complete = TRUE;
+
+          $response -> correct = $json -> correct;
+
+          return $response;
         },
         'permission_callback' => '__return_true'
 
@@ -1126,8 +1222,8 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'external-request', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
-          return $this->CallAPI($json["method"], $json["url"], $json["data"]);
+          $json = json_decode($request_data -> get_body());
+          return $this -> CallAPI($json["method"], $json["url"], $json["data"]);
         },
         'permission_callback' => '__return_true'
 
@@ -1164,7 +1260,6 @@ class Physics_Genie {
           );
         },
         'permission_callback' => '__return_true'
-
       ));
 
 
@@ -1183,11 +1278,11 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-name', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
           global $wpdb;
           return $wpdb -> update('wp_users', array(
-            'user_login' => $json['name'],
-            'user_nicename' => $json['name']
+            'user_login' => $json -> name,
+            'user_nicename' => $json -> name
           ), array(
             'ID' => get_current_user_id()
           ), null, array('%d'));
@@ -1214,7 +1309,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-setup', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
           global $wpdb;
           return $wpdb->update(getTable('pg_users'), array(
             'curr_diff' => intval($json['curr_diff']),
@@ -1258,25 +1353,34 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'edit-problem', array(
         'methods' => 'PUT',
         'callback' => function($request_data) {
-          $json = json_decode($request_data);
+          $json = json_decode($request_data -> get_body());
+
+          // Convert other_foci to a serialized integer array
+          if( $json -> other_foci === null )
+            $other_foci = null;
+          else
+            $other_foci = serialize(getFocusIds($json -> other_foci));
+
           global $wpdb;
-          return $wpdb -> update(getTable('pg_problems'), array(
-            'problem_text' => $json['problem_text'],
-            'diagram' => ($json['diagram'] === "" ? null : $json['diagram']),
-            'answer' => $json['answer'],
-            'must_match' => ($json['must_match'] === 'true' ? 1 : 0),
-            'error' => floatval($json['error']),
-            'solution' => $json['solution'],
-            'solution_diagram' => ($json['solution_diagram'] === "" ? null : $json['solution_diagram']),
-            'hint_one' => $json['hint_one'],
-            'hint_two' => ($json['hint_two'] === "" ? null : $json['hint_two']),
-            'source' => intval($json['source']),
-            'number_in_source' => $json['number_in_source'],
-            'difficulty' => intval($json['difficulty']),
-            'calculus' => $json['calculus'],
-            'topic' => $json['topic'],
-            'main_focus' => $json['main_focus'],
-            'other_foci' => ($json['other_foci'] === "" ? null: serialize($json['other_foci']))
+          return $wpdb -> update(getTable('pg_problems'), 
+          array(
+            'problem_text' => $json -> problem_text,
+            'diagram' => $json -> diagram,
+            'answer' => $json -> answer,
+            'must_match' => $json -> must_match,
+            'error' => floatval($json -> error),
+            'solution' => $json -> solution,
+            'solution_diagram' => $json -> solution_diagram,
+            'hint_one' => $json -> hint_one,
+            'hint_two' => $json -> hint_two,
+            'source' => intval($json -> source),
+            'number_in_source' => $json -> number_in_source,
+            'submitter' => get_current_user_id(),
+            'difficulty' => intval($json -> difficulty),
+            'calculus' => $json -> calculus,
+            'main_focus' => getFocusId($json -> main_focus),
+            'other_foci' => $other_foci,
+            'date_added' => date('Y-m-d')
           ), array(
             'problem_id' => $json['problem_id']
           ), null, array('%d'));
@@ -1286,11 +1390,6 @@ class Physics_Genie {
 
     });
   }
-
-  // public static function connect_another_db() {
-  //  global $seconddb;
-  //  $seconddb = new wpdb("physicsgenius", "Morin137!", "wordpress", "restored-instance-7-12-21.c4npn2kwj61c.us-west-1.rds.amazonaws.com");
-  // }
 
   // Call backend deploy script
   public function deploy_backend() {
@@ -1329,7 +1428,6 @@ class Physics_Genie {
 
     $result = curl_exec($curl);
 
-
     curl_close($curl);
 
     return $result;
@@ -1337,8 +1435,5 @@ class Physics_Genie {
 
 }
 
-
 // Initialize the plugin
 $physics_genie = new Physics_Genie();
-
-
