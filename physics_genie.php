@@ -214,7 +214,7 @@ class Physics_Genie {
         return intval($wpdb -> get_results("
           SELECT focus_id
           FROM ".getTable('pg_foci')."
-          WHERE name = '".$name."'
+          WHERE name = '".esc_sql($name)."'
         ;")[0] -> focus_id);
       }
 
@@ -252,7 +252,7 @@ class Physics_Genie {
         return intval($wpdb -> get_results("
           SELECT topic_id
           FROM ".getTable('pg_topics')."
-          WHERE name = '".$name."'
+          WHERE name = '".esc_sql($name)."'
         ;")[0] -> topic_id);
       }
 
@@ -1280,12 +1280,18 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data -> get_body());
           global $wpdb;
-          return $wpdb -> update('wp_users', array(
-            'user_login' => $json -> name,
-            'user_nicename' => $json -> name
-          ), array(
-            'ID' => get_current_user_id()
-          ), null, array('%d'));
+          return $wpdb -> update(
+            getTable('users'),
+            array(
+              'user_login' => $json -> name,
+              'user_nicename' => $json -> name
+            ),
+            array(
+              'ID' => get_current_user_id()
+            ),
+            null,
+            array('%d')
+          );
         },
         'permission_callback' => '__return_true'
       ));
@@ -1311,14 +1317,24 @@ class Physics_Genie {
         'callback' => function($request_data) {
           $json = json_decode($request_data -> get_body());
           global $wpdb;
-          return $wpdb->update(getTable('pg_users'), array(
-            'curr_diff' => intval($json['curr_diff']),
-            'curr_topics' => $json['curr_topics'],
-            'curr_foci' => $json['curr_foci'],
-            'calculus' => $json['calculus'] === 'true' ? 1 : 0
-          ), array(
-            'user_id' => get_current_user_id()
-          ), array('%d', '%s', '%s', '%d'), array('%d'));
+          return $wpdb -> update(
+            getTable('pg_users'),
+            array(
+              'curr_diff' => intval($json -> curr_diff),
+              'curr_topics' => serialize(
+                getTopicIds($json -> curr_topics)
+              ),
+              'curr_foci' => serialize(
+                getFocusIds($json -> curr_foci)
+              ),
+              'calculus' => $json -> calculus
+            ),
+            array(
+              'user_id' => get_current_user_id()
+            ),
+            array('%d', '%s', '%s', '%d'),
+            array('%d')
+          );
         },
         'permission_callback' => '__return_true'
       ));
@@ -1382,7 +1398,7 @@ class Physics_Genie {
             'other_foci' => $other_foci,
             'date_added' => date('Y-m-d')
           ), array(
-            'problem_id' => $json['problem_id']
+            'problem_id' => $json -> problem_id
           ), null, array('%d'));
         },
         'permission_callback' => '__return_true'
@@ -1432,7 +1448,6 @@ class Physics_Genie {
 
     return $result;
   }
-
 }
 
 // Initialize the plugin
