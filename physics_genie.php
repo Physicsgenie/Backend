@@ -883,22 +883,24 @@ class Physics_Genie {
               $focus_name = getFocusName($focus_id);
               $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
               $topic_xp += $focus_stat['xp'];
+              $focus_stat['focus'] = $focus_name;
 
-              $focus_stats[$focus_name] = $focus_stat;
+              array_push($focus_stats, $focus_stat);
             }
 
             $total_xp += $topic_xp;
             $topic_stat['focus_stats'] = $focus_stats;
             $topic_stat['longest_losestreak'] = - $topic_stat['longest_losestreak'];
             $topic_stat['xp'] = $topic_xp;
-            $topic_stats[$topic_name] = $topic_stat;
+            $topic_stat['topic'] = $topic_name;
+            array_push($topic_stats, $topic_stat);
           }
 
           $all_stats['topic_stats'] = $topic_stats;
           $all_stats['xp'] = $total_xp;
           $all_stats['longest_losestreak'] = - $all_stats['longest_losestreak'];
 
-          return json_encode($all_stats);
+          return $all_stats;
         },
         'permission_callback' => '__return_true'
       ));
@@ -1397,9 +1399,12 @@ class Physics_Genie {
             'main_focus' => getFocusId($json -> main_focus),
             'other_foci' => $other_foci,
             'date_added' => date('Y-m-d')
-          ), array(
+          ),
+          array(
             'problem_id' => $json -> problem_id
-          ), null, array('%d'));
+          ),
+          null,
+          array('%d'));
         },
         'permission_callback' => '__return_true'
       ));
