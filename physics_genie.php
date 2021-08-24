@@ -870,34 +870,44 @@ class Physics_Genie {
             }
           }
 
-          // Convert topic and focus ids to names
-          // Invert losestreak and sum xp
+          // Create the response object
           $topic_stats = [];
           $total_xp = 0;
+          // Loop through each topic
           foreach ( $all_stats['topic_stats'] as $topic_id => $topic_stat ){
+            // Set the topic name
             $topic_name = getTopicName($topic_id);
+            $topic_stat['topic'] = $topic_name;
             $focus_stats = [];
             $topic_xp = 0;
 
+            // Loop through each focus in the topic
             foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
+              // Set the focus name
               $focus_name = getFocusName($focus_id);
-              $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
-              $topic_xp += $focus_stat['xp'];
               $focus_stat['focus'] = $focus_name;
-
+              // Invert losestreak so the result is positive
+              $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
+              // Add xp
+              $topic_xp += $focus_stat['xp'];
               array_push($focus_stats, $focus_stat);
             }
 
             $total_xp += $topic_xp;
+            // Add the focus stats for the topic
             $topic_stat['focus_stats'] = $focus_stats;
+            // Invert the losestreak
             $topic_stat['longest_losestreak'] = - $topic_stat['longest_losestreak'];
+            // Set the total topic xp
             $topic_stat['xp'] = $topic_xp;
-            $topic_stat['topic'] = $topic_name;
             array_push($topic_stats, $topic_stat);
           }
 
+          // Add the complete stats for the topic
           $all_stats['topic_stats'] = $topic_stats;
+          // Set the total xp
           $all_stats['xp'] = $total_xp;
+          // Invert losestreak
           $all_stats['longest_losestreak'] = - $all_stats['longest_losestreak'];
 
           return json_encode($all_stats);
