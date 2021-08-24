@@ -900,7 +900,7 @@ class Physics_Genie {
           $all_stats['xp'] = $total_xp;
           $all_stats['longest_losestreak'] = - $all_stats['longest_losestreak'];
 
-          return $all_stats;
+          return json_encode($all_stats);
         },
         'permission_callback' => '__return_true'
       ));
