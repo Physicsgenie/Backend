@@ -275,7 +275,8 @@ class Physics_Genie {
         ;")[0] -> display_name;
       }
 
-      function getUserStats($id, $time){
+      // Time is the minimum time and difficulty is the minimum difficulty
+      function getUserStats($id, $time, $difficulty){
         global $wpdb;
 
         $topics = $wpdb -> get_results("
@@ -342,13 +343,13 @@ class Physics_Genie {
 
         // Loop through and calculate stats
         foreach ( $problems as $problem_id => $problem  ) {
-          if ( end($problem) -> date_attempted > $min_date){
-            $problem_info = $wpdb -> get_results("
-              SELECT main_focus, difficulty
-              FROM ".getTable('pg_problems')."
-              WHERE problem_id = ".$problem_id."
-            ;")[0];
+          $problem_info = $wpdb -> get_results("
+            SELECT main_focus, difficulty
+            FROM ".getTable('pg_problems')."
+            WHERE problem_id = ".$problem_id."
+          ;")[0];
 
+          if ( end($problem) -> date_attempted > $min_date && $problem_info -> difficulty >= $difficulty){
             $focus = $problem_info -> main_focus;
 
             $topic = $wpdb -> get_results("
@@ -916,7 +917,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
         'callback' => function() {
-          $all_stats = getUserStats(get_current_user_id(), 'all');
+          $all_stats = getUserStats(get_current_user_id(), 'all', 1);
 
           return $all_stats;
           // Create the response object
@@ -976,7 +977,7 @@ class Physics_Genie {
           $json -> time = $json -> time ?? 'all';
           $json -> topic = $json -> topic ?? 'all';
           $json -> focus = $json -> focus ?? 'all';
-          $json -> difficulty = $json -> difficulty ?? 'all';
+          $json -> difficulty = $json -> difficulty ?? 1;
 
           $users = $wpdb -> get_results("
             SELECT user_id
@@ -986,7 +987,7 @@ class Physics_Genie {
           $all_user_stats = [];
 
           foreach ( $users as $user ){
-            $all_user_stats[$user -> user_id] = getUserStats($user -> user_id, $json -> time);
+            $all_user_stats[$user -> user_id] = getUserStats($user -> user_id, $json -> time, $json -> difficulty);
           }
 
           if( $json -> topic !== 'any' ) {
