@@ -916,8 +916,9 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
         'callback' => function() {
-          $all_stats = getUserStats(get_current_user_id(), 'any');
+          $all_stats = getUserStats(get_current_user_id(), 'all');
 
+          return $all_stats;
           // Create the response object
           $topic_stats = [];
           // Loop through each topic
