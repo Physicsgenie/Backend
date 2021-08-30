@@ -265,6 +265,263 @@ class Physics_Genie {
         return $topic_ids; 
       }
 
+      function getUserStats($id){
+        global $wpdb;
+
+        $topics = $wpdb -> get_results("
+          SELECT topic_id, name 
+          FROM ".getTable('pg_topics')."
+        ;");
+
+        // Create an object of topics and foci to calculate the stats
+        $blank_stats = array (
+          'num_presented' => 0,
+          'num_completed' => 0,
+          'num_correct' => 0,
+          'num_incorrect' => 0,
+          'num_attempts' => 0,
+          'completed_attempts' => 0,
+          'avg_attempts' => 0,
+          'give_ups' => 0,
+          'xp' => 0,
+          'streak' => 0,
+          'longest_winstreak' => 0,
+          'longest_losestreak' => 0,
+        );
+
+        $all_stats = $blank_stats;
+
+        foreach ( $topics as $topic ) {
+          $foci = $wpdb -> get_results("
+            SELECT focus_id, topic
+            FROM ".getTable('pg_foci')."
+            WHERE topic = ".$topic -> topic_id."
+          ;");
+
+          $all_stats['topic_stats'][$topic -> topic_id] = $blank_stats;
+          foreach ( $foci as $focus ) {
+            $all_stats['topic_stats'][$topic -> topic_id]['focus_stats'][$focus -> focus_id] = $blank_stats;
+          }
+        }
+
+        // Get attempts
+        $attempts = $wpdb -> get_results("
+          SELECT *
+          FROM ".getTable('pg_user_attempts')."
+          WHERE user_id = ".$id."
+          ORDER BY date_attempted ASC, problem_id
+        ;");
+
+        // Group the attempts into arrays of problems
+        $problems = [];
+        foreach ( $attempts as $attempt ) {
+          $problems[$attempt -> problem_id][] = $attempt;
+        }
+
+        // Sort the problems by the date of the last attempt (ensures completed problems are always in order)
+        uasort($problems, function ($a, $b) {
+          return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
+        });
+
+        // Loop through and calculate stats
+        foreach ( $problems as $problem_id => $problem  ) {
+          $problem_info = $wpdb -> get_results("
+            SELECT main_focus, difficulty
+            FROM ".getTable('pg_problems')."
+            WHERE problem_id = ".$problem_id."
+          ;")[0];
+
+          $focus = $problem_info -> main_focus;
+
+          $topic = $wpdb -> get_results("
+            SELECT topic
+            FROM ".getTable('pg_foci')."
+            WHERE focus_id = ".$focus."
+          ;")[0] -> topic;
+
+          // Whether or not the problem is correct
+          $correct = False;
+          // A problem is not completed if the user still has attempts remaining
+          $completed = False;
+          // Only counts attempts for completed problems
+          $completed_attempts = 0;
+
+          // Loop through the problem attempts until a correct answer or a give up
+          $break = False;
+          for( $i = 0; $i < count($problem); $i++ ) {
+            if($problem[$i] -> give_up === "1"){
+              $completed = True;
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['give_ups'] ++;
+              $all_stats['topic_stats'][$topic]['give_ups'] ++;
+              $all_stats['give_ups'] ++;
+              $break = True;
+            }
+            if($problem[$i] -> correct === "1"){
+              $correct = True;
+              $completed = True;
+              $break = True;
+            }
+            // Increase attempts if not a give up
+            if( $problem[$i] -> give_up === "0" ){
+              $completed_attempts ++;
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_attempts'] ++;
+              $all_stats['topic_stats'][$topic]['num_attempts'] ++;
+              $all_stats['num_attempts'] ++;
+            }
+
+            if( $break )
+              break;
+          }
+
+          // Set the problem as completed if all attempts have been used
+          if( $completed === False && count($problem) >= 3 )
+            $completed = True;
+
+          // Increase presented problems
+          $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_presented'] ++;
+          $all_stats['topic_stats'][$topic]['num_presented'] ++;
+          $all_stats['num_presented'] ++;
+
+          if( $completed ) {
+            // Increment completed attempts
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['completed_attempts'] += $completed_attempts;
+            $all_stats['topic_stats'][$topic]['completed_attempts'] +- $completed_attempts;
+            $all_stats['completed_attempts'] += $completed_attempts;
+
+            // Increment completed problems
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_completed'] ++;
+            $all_stats['topic_stats'][$topic]['num_completed'] ++;
+            $all_stats['num_completed'] ++;
+
+            if( $correct ){
+              // Increment correct problems
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_correct'] ++;
+              $all_stats['topic_stats'][$topic]['num_correct'] ++;
+              $all_stats['num_correct'] ++;
+
+              // Increment focus xp based on difficulty and streak (topic and overall xp is adedd)
+              // 15% bonus if xp is streak is a multiple of 5
+              $base_xp = $problem_info -> difficulty * ( 4 - count($problem) );
+              if( 
+                intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) > 0 &&
+                intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) % 5 == 0
+              )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp * 1.15;
+              else
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp;
+
+              // Set the focus streak stats
+              if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] >= 0 )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] ++;
+              elseif( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] < 0 )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] = 1;
+
+              // Set the topic streak stats
+              if( $all_stats['topic_stats'][$topic]['streak'] >= 0 )
+                $all_stats['topic_stats'][$topic]['streak'] ++;
+              elseif( $all_stats['topic_stats'][$topic]['streak'] < 0 )
+                $all_stats['topic_stats'][$topic]['streak'] = 1;
+
+              // Set the overall streak stats
+              if( $all_stats['streak'] >= 0 )
+                $all_stats['streak'] ++;
+              elseif( $all_stats['streak'] < 0 )
+                $all_stats['streak'] = 1;
+
+            } else {
+              // Increment incorrect problems
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_incorrect'] ++;
+              $all_stats['topic_stats'][$topic]['num_incorrect'] ++;
+              $all_stats['num_incorrect'] ++;
+
+              // Set the focus streak stats
+              if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] <= 0 )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] --;
+              elseif( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] > 0 )
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] = -1;
+
+              // Set the topic streak stats
+              if( $all_stats['topic_stats'][$topic]['streak'] <= 0 )
+                $all_stats['topic_stats'][$topic]['streak'] --;
+              elseif( $all_stats['topic_stats'][$topic]['streak'] > 0 )
+                $all_stats['topic_stats'][$topic]['streak'] = -1;
+
+              // Set the overall streak stats
+              if( $all_stats['streak'] <= 0 )
+                $all_stats['streak'] --;
+              elseif( $all_stats['streak'] > 0 )
+                $all_stats['streak'] = -1;
+           }
+
+            // Set the focus longest winstreak
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_winstreak'] = 
+              max(
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_winstreak'],
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
+              );
+
+            // Set the focus longest losestreak
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'] = 
+              min(
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'],
+                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
+              );
+
+            // Set the topic longest winstreak
+            $all_stats['topic_stats'][$topic]['longest_winstreak'] =
+              max(
+                $all_stats['topic_stats'][$topic]['longest_winstreak'],
+                $all_stats['topic_stats'][$topic]['streak'],
+              );
+
+            // Set the topic longest losestreak
+            $all_stats['topic_stats'][$topic]['longest_losestreak'] =
+              min(
+                $all_stats['topic_stats'][$topic]['longest_losestreak'],
+                $all_stats['topic_stats'][$topic]['streak'],
+              );
+
+            // Set the overall longest winstreak
+            $all_stats['longest_winstreak'] = 
+              max(
+                $all_stats['longest_winstreak'],
+                $all_stats['streak'],
+              );
+
+            // Set the overall longest losestreak
+            $all_stats['longest_losestreak'] = 
+              min(
+                $all_stats['longest_losestreak'],
+                $all_stats['streak'],
+              );
+
+            // Set the average attempts
+            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['avg_attempts'] = 
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['completed_attempts']/
+              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_completed'];
+
+            $all_stats['topic_stats'][$topic]['avg_attempts'] = 
+              $all_stats['topic_stats'][$topic]['completed_attempts']/
+              $all_stats['topic_stats'][$topic]['num_completed'];
+
+            $all_stats['avg_attempts'] = 
+              $all_stats['completed_attempts']/
+              $all_stats['num_completed'];
+          }
+        }
+        $total_xp = 0;
+        foreach ( $all_stats['topic_stats'] as $topic_id => $topic_stat ){
+          $topic_xp = 0;
+          // Loop through each focus in the topic
+          foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
+            $topic_xp += $focus_stat['xp'];
+          }
+          $topic_stat[$topic_id]['xp'] = $topic_xp;
+        }
+        $all_stats['xp'] = $total_xp;
+        return $all_stats;
+      }
+
       // Test functions endpoint
       if($GLOBALS['DEBUG']){
         global $wpdb;
@@ -625,249 +882,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
         'callback' => function() {
-          global $wpdb;
-
-          $topics = $wpdb -> get_results("
-            SELECT topic_id, name 
-            FROM ".getTable('pg_topics')."
-          ;");
-
-          // Create an object of topics and foci to calculate the stats
-          $blank_stats = array (
-            'num_presented' => 0,
-            'num_completed' => 0,
-            'num_correct' => 0,
-            'num_incorrect' => 0,
-            'num_attempts' => 0,
-            'completed_attempts' => 0,
-            'avg_attempts' => 0,
-            'give_ups' => 0,
-            'xp' => 0,
-            'streak' => 0,
-            'longest_winstreak' => 0,
-            'longest_losestreak' => 0,
-          );
-
-          $all_stats = $blank_stats;
-
-          foreach ( $topics as $topic ) {
-            $foci = $wpdb -> get_results("
-              SELECT focus_id, topic
-              FROM ".getTable('pg_foci')."
-              WHERE topic = ".$topic -> topic_id."
-            ;");
-
-            $all_stats['topic_stats'][$topic -> topic_id] = $blank_stats;
-            foreach ( $foci as $focus ) {
-              $all_stats['topic_stats'][$topic -> topic_id]['focus_stats'][$focus -> focus_id] = $blank_stats;
-            }
-          }
-
-          // Get attempts
-          $attempts = $wpdb -> get_results("
-            SELECT *
-            FROM ".getTable('pg_user_attempts')."
-            WHERE user_id = ".get_current_user_id()."
-            ORDER BY date_attempted ASC, problem_id
-          ;");
-
-          // Group the attempts into arrays of problems
-          $problems = [];
-          foreach ( $attempts as $attempt ) {
-            $problems[$attempt -> problem_id][] = $attempt;
-          }
-
-          // Sort the problems by the date of the last attempt (ensures completed problems are always in order)
-          uasort($problems, function ($a, $b) {
-            return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
-          });
-
-          // Loop through and calculate stats
-          foreach ( $problems as $problem_id => $problem  ) {
-            $problem_info = $wpdb -> get_results("
-              SELECT main_focus, difficulty
-              FROM ".getTable('pg_problems')."
-              WHERE problem_id = ".$problem_id."
-            ;")[0];
-
-            $focus = $problem_info -> main_focus;
-
-            $topic = $wpdb -> get_results("
-              SELECT topic
-              FROM ".getTable('pg_foci')."
-              WHERE focus_id = ".$focus."
-            ;")[0] -> topic;
-
-            // Whether or not the problem is correct
-            $correct = False;
-            // A problem is not completed if the user still has attempts remaining
-            $completed = False;
-            // Only counts attempts for completed problems
-            $completed_attempts = 0;
-
-            // Loop through the problem attempts until a correct answer or a give up
-            $break = False;
-            for( $i = 0; $i < count($problem); $i++ ) {
-              if($problem[$i] -> give_up === "1"){
-                $completed = True;
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['give_ups'] ++;
-                $all_stats['topic_stats'][$topic]['give_ups'] ++;
-                $all_stats['give_ups'] ++;
-                $break = True;
-              }
-              if($problem[$i] -> correct === "1"){
-                $correct = True;
-                $completed = True;
-                $break = True;
-              }
-              // Increase attempts if not a give up
-              if( $problem[$i] -> give_up === "0" ){
-                $completed_attempts ++;
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_attempts'] ++;
-                $all_stats['topic_stats'][$topic]['num_attempts'] ++;
-                $all_stats['num_attempts'] ++;
-              }
-
-              if( $break )
-                break;
-            }
-
-            // Set the problem as completed if all attempts have been used
-            if( $completed === False && count($problem) >= 3 )
-              $completed = True;
-
-            // Increase presented problems
-            $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_presented'] ++;
-            $all_stats['topic_stats'][$topic]['num_presented'] ++;
-            $all_stats['num_presented'] ++;
-
-            if( $completed ) {
-              // Increment completed attempts
-              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['completed_attempts'] += $completed_attempts;
-              $all_stats['topic_stats'][$topic]['completed_attempts'] +- $completed_attempts;
-              $all_stats['completed_attempts'] += $completed_attempts;
-
-              // Increment completed problems
-              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_completed'] ++;
-              $all_stats['topic_stats'][$topic]['num_completed'] ++;
-              $all_stats['num_completed'] ++;
-
-              if( $correct ){
-                // Increment correct problems
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_correct'] ++;
-                $all_stats['topic_stats'][$topic]['num_correct'] ++;
-                $all_stats['num_correct'] ++;
-
-                // Increment focus xp based on difficulty and streak (topic and overall xp is adedd)
-                // 15% bonus if xp is streak is a multiple of 5
-                $base_xp = $problem_info -> difficulty * ( 4 - count($problem) );
-                if( 
-                  intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) > 0 &&
-                  intval($all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak']) % 5 == 0
-                )
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp * 1.15;
-                else
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['xp'] += $base_xp;
-
-                // Set the focus streak stats
-                if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] >= 0 )
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] ++;
-                elseif( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] < 0 )
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] = 1;
-
-                // Set the topic streak stats
-                if( $all_stats['topic_stats'][$topic]['streak'] >= 0 )
-                  $all_stats['topic_stats'][$topic]['streak'] ++;
-                elseif( $all_stats['topic_stats'][$topic]['streak'] < 0 )
-                  $all_stats['topic_stats'][$topic]['streak'] = 1;
-
-                // Set the overall streak stats
-                if( $all_stats['streak'] >= 0 )
-                  $all_stats['streak'] ++;
-                elseif( $all_stats['streak'] < 0 )
-                  $all_stats['streak'] = 1;
-
-              } else {
-                // Increment incorrect problems
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_incorrect'] ++;
-                $all_stats['topic_stats'][$topic]['num_incorrect'] ++;
-                $all_stats['num_incorrect'] ++;
- 
-                // Set the focus streak stats
-                if( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] <= 0 )
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] --;
-                elseif( $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] > 0 )
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'] = -1;
-
-                // Set the topic streak stats
-                if( $all_stats['topic_stats'][$topic]['streak'] <= 0 )
-                  $all_stats['topic_stats'][$topic]['streak'] --;
-                elseif( $all_stats['topic_stats'][$topic]['streak'] > 0 )
-                  $all_stats['topic_stats'][$topic]['streak'] = -1;
-
-                // Set the overall streak stats
-                if( $all_stats['streak'] <= 0 )
-                  $all_stats['streak'] --;
-                elseif( $all_stats['streak'] > 0 )
-                  $all_stats['streak'] = -1;
-             }
-
-              // Set the focus longest winstreak
-              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_winstreak'] = 
-                max(
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_winstreak'],
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
-                );
-
-              // Set the focus longest losestreak
-              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'] = 
-                min(
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['longest_losestreak'],
-                  $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['streak'],
-                );
-
-              // Set the topic longest winstreak
-              $all_stats['topic_stats'][$topic]['longest_winstreak'] =
-                max(
-                  $all_stats['topic_stats'][$topic]['longest_winstreak'],
-                  $all_stats['topic_stats'][$topic]['streak'],
-                );
-
-              // Set the topic longest losestreak
-              $all_stats['topic_stats'][$topic]['longest_losestreak'] =
-                min(
-                  $all_stats['topic_stats'][$topic]['longest_losestreak'],
-                  $all_stats['topic_stats'][$topic]['streak'],
-                );
-
-              // Set the overall longest winstreak
-              $all_stats['longest_winstreak'] = 
-                max(
-                  $all_stats['longest_winstreak'],
-                  $all_stats['streak'],
-                );
-
-              // Set the overall longest losestreak
-              $all_stats['longest_losestreak'] = 
-                min(
-                  $all_stats['longest_losestreak'],
-                  $all_stats['streak'],
-                );
-
-              // Set the average attempts
-              $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['avg_attempts'] = 
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['completed_attempts']/
-                $all_stats['topic_stats'][$topic]['focus_stats'][$focus]['num_completed'];
-
-              $all_stats['topic_stats'][$topic]['avg_attempts'] = 
-                $all_stats['topic_stats'][$topic]['completed_attempts']/
-                $all_stats['topic_stats'][$topic]['num_completed'];
-
-              $all_stats['avg_attempts'] = 
-                $all_stats['completed_attempts']/
-                $all_stats['num_completed'];
-            }
-          }
+          $all_stats = getUserStats(get_current_user_id());
 
           // Create the response object
           $topic_stats = [];
@@ -929,6 +944,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'leaderboard', array(
         'methods' => 'GET',
         'callback' => function($request_data) {
+          return getUserStats(1);
           global $wpdb;
           $json = json_decode($request_data -> get_body());
           $json -> type = $json -> type ?? 'xp';
@@ -1033,18 +1049,18 @@ class Physics_Genie {
 
               // Loop through the problem attempts until a correct answer or a give up
               $break = False;
+              $user_attempts = [];
               for( $i = 0; $i < count($problem); $i++ ) {
                 if($problem[$i] -> give_up === "1"){
                   $completed = True;
                   $all_user_stats[$user_id]['topic_stats'][$topic]['focus_stats'][$focus]['give_ups'] ++;
                   $all_user_stats[$user_id]['topic_stats'][$topic]['give_ups'] ++;
                   $all_user_stats[$user_id]['give_ups'] ++;
-                  $break = True;
                 }
+
                 if($problem[$i] -> correct === "1"){
                   $correct = True;
                   $completed = True;
-                  $break = True;
                 }
 
                 // Increase attempts if not a give up
@@ -1054,9 +1070,6 @@ class Physics_Genie {
                   $all_user_stats[$user_id]['topic_stats'][$topic]['num_attempts'] ++;
                   $all_user_stats[$user_id]['num_attempts'] ++;
                 }
-
-                if( $break )
-                  break;
               }
 
               // Set the problem as completed if all attempts have been used
