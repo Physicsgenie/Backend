@@ -334,6 +334,7 @@ class Physics_Genie {
           return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
         });
 
+        // Calculate the minimum date of problems to calculate stats for
         if( $time === 'any' )
           $min_date = date_create("1970-01-01");
         else if ( $time === 'week' )
@@ -349,6 +350,7 @@ class Physics_Genie {
             WHERE problem_id = ".$problem_id."
           ;")[0];
 
+          // Check if the problem meets the difficulty and time requirements
           if ( end($problem) -> date_attempted > $min_date && $problem_info -> difficulty >= $difficulty){
             $focus = $problem_info -> main_focus;
 
@@ -919,7 +921,6 @@ class Physics_Genie {
         'callback' => function() {
           $all_stats = getUserStats(get_current_user_id(), 'all', 1);
 
-          return $all_stats;
           // Create the response object
           $topic_stats = [];
           // Loop through each topic
@@ -973,6 +974,7 @@ class Physics_Genie {
         'callback' => function($request_data) {
           global $wpdb;
           $json = json_decode($request_data -> get_body());
+          // Set default values
           $json -> type = $json -> type ?? 'xp';
           $json -> time = $json -> time ?? 'all';
           $json -> topic = $json -> topic ?? 'all';
@@ -986,10 +988,12 @@ class Physics_Genie {
 
           $all_user_stats = [];
 
+          // Create an array of all user stats based on time and difficulty
           foreach ( $users as $user ){
             $all_user_stats[$user -> user_id] = getUserStats($user -> user_id, $json -> time, $json -> difficulty);
           }
 
+          // Set the topic and focus ids if they are not any
           if( $json -> topic !== 'any' ) {
             $topic_id = getTopicId($json -> topic);
           }
@@ -997,7 +1001,9 @@ class Physics_Genie {
             $focus_id = getFocusId($json -> focus);
           }
 
+          // Response array
           $stat_leaderboard = [];
+          // Sort all the stats based on the request type, then set the corresponding values in stat leaderboard
           if( $json -> type === 'xp' ){
             // If the topic is all return overall stats
             if( $json -> topic === 'all' ){
