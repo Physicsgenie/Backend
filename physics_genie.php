@@ -275,6 +275,26 @@ class Physics_Genie {
         ;")[0] -> display_name;
       }
 
+      // Get user display name
+      function getSourceId($id){
+        global $wpdb;
+        return $wpdb -> get_results("
+          SELECT display_name
+          FROM ".getTable('users')."
+          WHERE id = ".$id."
+        ;")[0] -> display_name;
+      }
+
+      // Get user display name
+      function getSourceName($id){
+        global $wpdb;
+        return $wpdb -> get_results("
+          SELECT display_name
+          FROM ".getTable('users')."
+          WHERE id = ".$id."
+        ;")[0] -> display_name;
+      }
+
       // Time is the minimum time and difficulty is the minimum difficulty
       function getUserStats($id, $time, $difficulty){
         global $wpdb;
@@ -957,8 +977,10 @@ class Physics_Genie {
         'permission_callback' => '__return_true'
       ));
 
+      /********* POST REQUESTS *********/
+
       /**
-       * @api {get} /leaderboard Get leaderboard stats
+       * @api {POST} /leaderboard Get leaderboard stats
        * @apiName GetLeaderboardStats
        * @apiGroup User 
        * @apiDescription Gets leaderboard statistics based on type, time, topic, focus, and difficulty.
@@ -970,7 +992,7 @@ class Physics_Genie {
        *
        */
       register_rest_route('physics_genie', 'leaderboard', array(
-        'methods' => 'GET',
+        'methods' => 'POST',
         'callback' => function($request_data) {
           global $wpdb;
           $json = json_decode($request_data -> get_body());
@@ -1013,7 +1035,9 @@ class Physics_Genie {
               foreach ( $all_user_stats as $user_id => $user_stat  ) {
                 array_push($stat_leaderboard, array(
                   "user" => getUserName($user_id),
-                  "value" => $user_stat['xp'],
+                  "xp" => $user_stat['xp'],
+                  "num_correct" => $user_stat['num_correct'],
+                  "num_presented" => $user_stat['num_presented'],
                 ));
               }
             } else {
@@ -1025,7 +1049,9 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['num_presented'],
                   ));
                 }
               } else {
@@ -1038,7 +1064,9 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['xp'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_presented'],
                   ));
                 }
               }
@@ -1052,7 +1080,9 @@ class Physics_Genie {
               foreach ( $all_user_stats as $user_id => $user_stat  ) {
                 array_push($stat_leaderboard, array(
                   "user" => getUserName($user_id),
-                  "value" => $user_stat['num_correct'],
+                  "num_correct" => $user_stat['num_correct'],
+                  "xp" => $user_stat['xp'],
+                  "num_presented" => $user_stat['num_presented'],
                 ));
               }
             } else {
@@ -1064,7 +1094,9 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['num_presented'],
                   ));
                 }
               } else {
@@ -1077,7 +1109,9 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['xp'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_presented'],
                   ));
                 }
               }
@@ -1091,7 +1125,10 @@ class Physics_Genie {
               foreach ( $all_user_stats as $user_id => $user_stat  ) {
                 array_push($stat_leaderboard, array(
                   "user" => getUserName($user_id),
-                  "value" => $user_stat['longest_winstreak'],
+                  "longest_winstreak" => $user_stat['longest_winstreak'],
+                  "xp" => $user_stat['xp'],
+                  "num_correct" => $user_stat['num_correct'],
+                  "num_presented" => $user_stat['num_presented'],
                 ));
               }
             } else {
@@ -1103,7 +1140,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['longest_winstreak'],
+                    "longest_winstreak" => $user_stat['topic_stats'][$topic_id]['longest_winstreak'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['num_presented'],
                   ));
                 }
               } else {
@@ -1116,7 +1156,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['longest_winstreak'],
+                    "longest_winstreak" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['longest_winstreak'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_presented'],
                   ));
                 }
               }
@@ -1130,7 +1173,10 @@ class Physics_Genie {
               foreach ( $all_user_stats as $user_id => $user_stat  ) {
                 array_push($stat_leaderboard, array(
                   "user" => getUserName($user_id),
-                  "value" => $user_stat['streak'],
+                  "streak" => $user_stat['streak'],
+                  "xp" => $user_stat['xp'],
+                  "num_correct" => $user_stat['num_correct'],
+                  "num_presented" => $user_stat['num_presented'],
                 ));
               }
             } else {
@@ -1142,7 +1188,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['streak'],
+                    "streak" => $user_stat['topic_stats'][$topic_id]['streak'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['num_presented'],
                   ));
                 }
               } else {
@@ -1155,7 +1204,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['streak'],
+                    "streak" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['streak'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_presented'],
                   ));
                 }
               }
@@ -1169,7 +1221,10 @@ class Physics_Genie {
               foreach ( $all_user_stats as $user_id => $user_stat  ) {
                 array_push($stat_leaderboard, array(
                   "user" => getUserName($user_id),
-                  "value" => $user_stat['submitted'],
+                  "submitted" => $user_stat['submitted'],
+                  "xp" => $user_stat['xp'],
+                  "num_correct" => $user_stat['num_correct'],
+                  "num_presented" => $user_stat['num_presented'],
                 ));
               }
             } else {
@@ -1181,7 +1236,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['submitted'],
+                    "submitted" => $user_stat['topic_stats'][$topic_id]['submitted'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['xp'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['num_presented'],
                   ));
                 }
               } else {
@@ -1194,7 +1252,10 @@ class Physics_Genie {
                 foreach ( $all_user_stats as $user_id => $user_stat  ) {
                   array_push($stat_leaderboard, array(
                     "user" => getUserName($user_id),
-                    "value" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['submitted'],
+                    "submitted" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['submitted'],
+                    "xp" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['submitted'],
+                    "num_correct" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_correct'],
+                    "num_presented" => $user_stat['topic_stats'][$topic_id]['focus_stats'][$focus_id]['num_presented'],
                   ));
                 }
               }
@@ -1206,8 +1267,6 @@ class Physics_Genie {
         'permission_callback' => '__return_true'
       ));
 
-
-      /********* POST REQUESTS *********/
 
       /**
        * @api {post} /register Register
