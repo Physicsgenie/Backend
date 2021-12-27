@@ -296,7 +296,7 @@ class Physics_Genie {
       }
 
       // Time is the minimum time and difficulty is the minimum difficulty
-      function getUserStats($id, $time, $difficulty){
+      function getUserStats($id, $time, $min_difficulty, $max_difficulty){
         global $wpdb;
 
         $topics = $wpdb -> get_results("
@@ -371,7 +371,7 @@ class Physics_Genie {
           ;")[0];
 
           // Check if the problem meets the difficulty and time requirements
-          if ( end($problem) -> date_attempted > $min_date && $problem_info -> difficulty >= $difficulty){
+          if ( end($problem) -> date_attempted > $min_date && $problem_info -> difficulty >= $min_difficulty && $problem_info -> difficulty <= $max_difficulty ) {
             $focus = $problem_info -> main_focus;
 
             $topic = $wpdb -> get_results("
@@ -939,7 +939,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-stats', array(
         'methods' => 'GET',
         'callback' => function() {
-          $all_stats = getUserStats(get_current_user_id(), 'all', 1);
+          $all_stats = getUserStats(get_current_user_id(), 'all', 1, 5);
 
           // Create the response object
           $topic_stats = [];
@@ -988,7 +988,7 @@ class Physics_Genie {
        * @apiParam {String} time Either week, month, or all
        * @apiParam {String} topic Either the topic name or all
        * @apiParam {String} focus Either the focus name or all
-       * @apiParam {Number} difficulty The difficulty level 
+       * @apiParam {String} difficulty The difficulty level, all, easy, medium, or hard
        *
        */
       register_rest_route('physics_genie', 'leaderboard', array(
@@ -1001,7 +1001,27 @@ class Physics_Genie {
           $json -> time = $json -> time ?? 'all';
           $json -> topic = $json -> topic ?? 'all';
           $json -> focus = $json -> focus ?? 'all';
-          $json -> difficulty = $json -> difficulty ?? 1;
+          $json -> difficulty = $json -> difficulty ?? 'all';
+
+          if( $json -> difficulty == 'all' ){
+            $min_diff = 1;
+            $max_diff = 5;
+          }
+          else if( $json -> difficulty == 'easy' ){
+            $min_diff = 1;
+            $max_diff = 3;
+          }
+          else if( $json -> difficulty == 'medium' ){
+            $min_diff = 2;
+            $max_diff = 4;
+          }
+          else if( $json -> difficulty == 'hard' ){
+            $min_diff = 3;
+            $max_diff = 5;
+          }
+          else {
+            return json_encode(['error' => 'Invalid difficulty']);
+          }
 
           $users = $wpdb -> get_results("
             SELECT user_id
@@ -1012,7 +1032,7 @@ class Physics_Genie {
 
           // Create an array of all user stats based on time and difficulty
           foreach ( $users as $user ){
-            $all_user_stats[$user -> user_id] = getUserStats($user -> user_id, $json -> time, $json -> difficulty);
+            $all_user_stats[$user -> user_id] = getUserStats($user -> user_id, $json -> time, $min_diff, $max_diff);
           }
 
           // Set the topic and focus ids if they are not any
