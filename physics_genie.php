@@ -730,6 +730,13 @@ class Physics_Genie {
           ;")[0] -> topic );
           $problem -> main_focus = getFocusName( $problem -> main_focus );
 
+          // Return the problem_errors that match the problem id
+          $problem -> problem_errors = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_problem_errors')."
+            WHERE problem_id = ".$problem -> problem_id."
+          ;");
+
           return json_encode($problem);
         },
         'permission_callback' => '__return_true'
@@ -784,6 +791,13 @@ class Physics_Genie {
           ;")[0] -> topic );
           $problem -> main_focus = getFocusName( $problem -> main_focus );
 
+          // Return the problem_errors that match the problem id
+          $problem -> problem_errors = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_problem_errors')."
+            WHERE problem_id = ".$problem -> problem_id."
+          ;");
+
           return json_encode($problem);
         },
         'permission_callback' => '__return_true'
@@ -830,7 +844,15 @@ class Physics_Genie {
               WHERE focus_id = ".($problem -> main_focus)."
             ;")[0] -> topic );
             $problem -> main_focus = getFocusName( $problem -> main_focus );
-          }
+
+
+            // Return the problem_errors that match the problem id
+            $problem -> problem_errors = $wpdb -> get_results("
+              SELECT *
+              FROM ".getTable('pg_problem_errors')."
+              WHERE problem_id = ".$problem -> problem_id."
+            ;");
+            }
           return json_encode($problems);
         },
         'permission_callback' => '__return_true'
@@ -1411,6 +1433,56 @@ class Physics_Genie {
             )
           );
 
+          // Email the submitter of the problem error
+          $submitter_email = $wpdb -> get_var(
+            $wpdb -> prepare(
+              "SELECT user_email FROM " . getTable('users') . " WHERE ID = (
+                SELECT submitter FROM " . getTable('pg_problems') . " 
+                WHERE problem_id = %d
+              )",
+              $json -> problem_id
+            )
+          );
+
+          $user_name = $wpdb -> get_var(
+            $wpdb -> prepare(
+              "SELECT display_name FROM " . getTable('users') . " WHERE ID = %d",
+              get_current_user_id()
+            )
+          );
+
+          wp_mail(
+            $submitter_email,
+            "[Physics Genie] Problem Error Reported",
+            "We have recieved an error report for one of your problems.\nPlease visit https://app.physicsgenie.ga/submit-portal/" . $json -> problem_id . " to resolve the issue.\n\n" .
+            "Details:\n" .
+            "User: " . $user_name . "\n" .
+            "Problem ID: " . $json -> problem_id . "\n" .
+            "Error Location: " . $json -> error_location . "\n" .
+            "Error Type: " . $json -> error_type . "\n" .
+            "Error Message: " . $json -> error_message
+          );
+
+          // Email the user that reported the problem error
+          /*
+          $user_email = $wpdb -> get_var(
+            $wpdb -> prepare(
+              "SELECT user_email FROM " . getTable('users') . " WHERE ID = %d",
+              get_current_user_id()
+            )
+          );
+
+          wp_mail(
+            $user_email,
+            "[Physics Genie] Problem Error Reported",
+            "Thank you for reporting a problem error. We will review it as soon as possible.\n" .
+            "Problem ID: " . $json -> problem_id . "\n" .
+            "Error Location: " . $json -> error_location . "\n" .
+            "Error Type: " . $json -> error_type . "\n" .
+            "Error Message: " . $json -> error_message
+          );
+           */
+
           return $wpdb -> insert_id;
         },
         'permission_callback' => '__return_true'
@@ -1744,6 +1816,7 @@ class Physics_Genie {
        * @apiParam {String} topic Character id of topic of problem.
        * @apiParam {String} main_focus Character id of primary focus of problem.
        * @apiParam {String} other_foci Array of focus_ids. Empty string if no other foci.
+       * @apiParam {String} errors_addressed Array of problem_error_ids.
        *
        * @apiSuccess {Number} data Returns 1 on success.
        */
@@ -1759,6 +1832,51 @@ class Physics_Genie {
             $other_foci = serialize(getFocusIds($json -> other_foci));
 
           global $wpdb;
+
+          // Update problem errors
+          foreach($json -> errors_addressed as $error_id) {
+            $wpdb -> update(
+              getTable('pg_problem_errors'),
+              array(
+                'addressed' => 1
+              ),
+              array(
+                'problem_error_id' => $error_id
+              ),
+              null,
+              array('%d')
+            );
+
+            // Email the user that their error has been addressed
+            $user_email = $wpdb -> get_var(
+              $wpdb -> prepare(
+                "SELECT user_email FROM " . getTable('users') . " WHERE ID = (
+                  SELECT user_id FROM " . getTable('pg_problem_errors') . " 
+                  WHERE problem_error_id = %d
+                )",
+                $error_id
+              )
+            );
+
+            $error_info = $wpdb -> get_row(
+              $wpdb -> prepare(
+                "SELECT * FROM " . getTable('pg_problem_errors') . " WHERE problem_error_id = %d",
+                $error_id
+              )
+            );
+
+            wp_mail(
+              $user_email,
+              "[Physics Genie] Problem Error Resolved",
+              "Thank you for reporting a problem error and contributing to PhysicsGenie!\nOur team has now addressed the issue.\n\n" .
+              "Details of the error are below:\n" .
+              "Problem ID: " . $error_info -> problem_id . "\n" .
+              "Error Location: " . $error_info -> error_location . "\n" .
+              "Error Type: " . $error_info -> error_type . "\n" .
+              "Error Message: " . $error_info -> error_message
+            );
+          }
+
           return $wpdb -> update(getTable('pg_problems'), 
           array(
             'problem_text' => $json -> problem_text,
