@@ -1676,7 +1676,7 @@ class Physics_Genie {
         'methods' => 'POST',
         'callback' => function($request_data) {
           $json = json_decode($request_data -> get_body());
-          return $this -> CallAPI($json["method"], $json["url"], $json["data"]);
+          return $this -> CallAPI($json -> method, $json -> url, $json -> data);
         },
         'permission_callback' => '__return_true'
 
