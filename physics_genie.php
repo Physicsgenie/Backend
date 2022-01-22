@@ -54,7 +54,7 @@ class Physics_Genie {
             current_user_can('editor') || 
             current_user_can('contributor');
 
-          return $data;
+          return json_encode($data);
         },
         'permission_callback' => '__return_true'
       ));
@@ -202,9 +202,10 @@ class Physics_Genie {
       // Convert an array of foci to names
       function getFocusNames($ids){
         $focus_names = [];
-        foreach( $ids as $id ) {
+        foreach( $ids as $id )
           array_push($focus_names, getFocusName($id));
-        }
+        if( $focus_names = [null] )
+          $focus_names = [];
         return $focus_names;
       }
 
@@ -1523,7 +1524,7 @@ class Physics_Genie {
 
           // Convert other_foci to a serialized integer array
           if( $json -> other_foci === null )
-            $other_foci = null;
+            $other_foci = [];
           else
             $other_foci = serialize(getFocusIds($json -> other_foci));
 
