@@ -1834,14 +1834,14 @@ class Physics_Genie {
           global $wpdb;
 
           // Update problem errors
-          foreach($json -> errors_addressed as $error_id) {
+          foreach($json -> errors_addressed as $error) {
             $wpdb -> update(
               getTable('pg_problem_errors'),
               array(
-                'addressed' => 1
+                'addressed' => $error[1] // Error code
               ),
               array(
-                'problem_error_id' => $error_id
+                'problem_error_id' => $error[0] // Error id
               ),
               null,
               array('%d')
@@ -1854,14 +1854,21 @@ class Physics_Genie {
                   SELECT user_id FROM " . getTable('pg_problem_errors') . " 
                   WHERE problem_error_id = %d
                 )",
-                $error_id
+                $error[0]
               )
             );
 
             $error_info = $wpdb -> get_row(
               $wpdb -> prepare(
                 "SELECT * FROM " . getTable('pg_problem_errors') . " WHERE problem_error_id = %d",
-                $error_id
+                $error[0]
+              )
+            );
+
+            $error_resolution = $wpdb -> get_row(
+              $wpdb -> prepare(
+                "SELECT type FROM " . getTable('pg_error_codes') . " WHERE code = %d",
+                $error[1]
               )
             );
 
@@ -1873,35 +1880,37 @@ class Physics_Genie {
               "Problem ID: " . $error_info -> problem_id . "\n" .
               "Error Location: " . $error_info -> error_location . "\n" .
               "Error Type: " . $error_info -> error_type . "\n" .
-              "Error Message: " . $error_info -> error_message
+              "Error Message: " . $error_info -> error_message . "\n" .
+              "Error Resolution: " . $error_resolution -> type
             );
           }
 
           return $wpdb -> update(getTable('pg_problems'), 
-          array(
-            'problem_text' => $json -> problem_text,
-            'diagram' => $json -> diagram,
-            'answer' => $json -> answer,
-            'must_match' => $json -> must_match,
-            'error' => floatval($json -> error),
-            'solution' => $json -> solution,
-            'solution_diagram' => $json -> solution_diagram,
-            'hint_one' => $json -> hint_one,
-            'hint_two' => $json -> hint_two,
-            'source' => intval($json -> source),
-            'number_in_source' => $json -> number_in_source,
-            'submitter' => get_current_user_id(),
-            'difficulty' => intval($json -> difficulty),
-            'calculus' => $json -> calculus,
-            'main_focus' => getFocusId($json -> main_focus),
-            'other_foci' => $other_foci,
-            'date_added' => date('Y-m-d')
-          ),
-          array(
-            'problem_id' => $json -> problem_id
-          ),
-          null,
-          array('%d'));
+            array(
+              'problem_text' => $json -> problem_text,
+              'diagram' => $json -> diagram,
+              'answer' => $json -> answer,
+              'must_match' => $json -> must_match,
+              'error' => floatval($json -> error),
+              'solution' => $json -> solution,
+              'solution_diagram' => $json -> solution_diagram,
+              'hint_one' => $json -> hint_one,
+              'hint_two' => $json -> hint_two,
+              'source' => intval($json -> source),
+              'number_in_source' => $json -> number_in_source,
+              'submitter' => get_current_user_id(),
+              'difficulty' => intval($json -> difficulty),
+              'calculus' => $json -> calculus,
+              'main_focus' => getFocusId($json -> main_focus),
+              'other_foci' => $other_foci,
+              'date_added' => date('Y-m-d')
+            ),
+            array(
+              'problem_id' => $json -> problem_id
+            ),
+            null,
+            array('%d')
+          );
         },
         'permission_callback' => '__return_true'
       ));
