@@ -1654,7 +1654,7 @@ class Physics_Genie {
 
           $response -> correct = $json -> correct;
 
-          return $response;
+          return json_encode($response);
         },
         'permission_callback' => '__return_true'
 
