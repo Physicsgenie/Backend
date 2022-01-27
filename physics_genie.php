@@ -95,7 +95,7 @@ class Physics_Genie {
           $focus_id = $wpdb -> get_results("
             SELECT topics_id
             FROM wordpress.".getTable('pg_topics_old')."
-            WHERE focus = '".$char."'
+            WHERE focus = '".$char."';
           ;")[0] -> topics_id;
           $wpdb -> update(
             getTable($newTable),
@@ -202,7 +202,7 @@ class Physics_Genie {
               array(
                 'user_id' => $problem -> user_id,
                 'problem_id' => $problem -> problem_id,
-                'student_answer' => null,
+                'student_answer' => '',
                 'correct' => False,
                 'give_up' => True,
                 'date_attempted' => $problem -> date_attempted,
@@ -292,11 +292,19 @@ class Physics_Genie {
       // Get user display name
       function getUserName($id){
         global $wpdb;
-        return $wpdb -> get_results("
-          SELECT display_name
-          FROM ".getTable('users')."
-          WHERE id = ".$id."
-        ;")[0] -> display_name;
+        if($GLOBALS['DEBUG']){
+          return $wpdb -> get_results("
+            SELECT display_name
+            FROM ".getTable('users')."
+            WHERE id = ".$id."
+          ;")[0] -> display_name;
+        } else {
+          return $wpdb -> get_results("
+            SELECT display_name
+            FROM wp_users
+            WHERE id = ".$id."
+          ;")[0] -> display_name;
+        }
       }
 
       // Get user display name
@@ -611,8 +619,9 @@ class Physics_Genie {
           'methods' => 'GET',
           'callback' => function($request){
               // Update main_focus in pg_problems
-              // updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
+              //updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
             //convertAttempts('pg_user_problems', 'pg_user_attempts');
+            serializeTopics('pg_users', 'pg_users_new', 'user_id', 'curr_foci');
          },
           'permission_callback' => '__return_true'
         ));
@@ -661,7 +670,7 @@ class Physics_Genie {
        * @apiSuccess {String} solution Solution of problem (LaTeX).
        * @apiSuccess {String} solution_diagram Solution diagram of problem (svg). null if no solution diagram.
        * @apiSuccess {String} hint_one First hint of problem (LaTeX).
-       * @apiSuccess {String} hint_two Second hint of problem (LaTeX). null if no second hint.
+       * @apiSuccess {String} hint_two Second hint of problem (LaTeX). null , 'curr_foci'if no second hint.
        * @apiSuccess {String} source Id of the source of the problem.
        * @apiSuccess {String} number_in_source Number of problem within the source.
        * @apiSuccess {String} submitter User id of the person who submitted the problem.
