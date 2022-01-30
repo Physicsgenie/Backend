@@ -618,10 +618,10 @@ class Physics_Genie {
         register_rest_route('physics_genie', 'test', array(
           'methods' => 'GET',
           'callback' => function($request){
-              // Update main_focus in pg_problems
-              //updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
-            //convertAttempts('pg_user_problems', 'pg_user_attempts');
-            serializeTopics('pg_users', 'pg_users_new', 'user_id', 'curr_foci');
+            // Update main_focus in pg_problems
+            // updateFocus('pg_problems', 'pg_problems_new', 'problem_id', 'main_focus');
+            // convertAttempts('pg_user_problems', 'pg_user_attempts');
+            // serializeTopics('pg_users', 'pg_users_new', 'user_id', 'curr_foci');
          },
           'permission_callback' => '__return_true'
         ));
@@ -1931,7 +1931,6 @@ class Physics_Genie {
               'hint_two' => $json -> hint_two,
               'source' => intval($json -> source),
               'number_in_source' => $json -> number_in_source,
-              'submitter' => get_current_user_id(),
               'difficulty' => intval($json -> difficulty),
               'calculus' => $json -> calculus,
               'main_focus' => getFocusId($json -> main_focus),
