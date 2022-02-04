@@ -1062,7 +1062,7 @@ class Physics_Genie {
             $problem -> attempts = $attempts;
             array_push($data, $problem);
           }
-          return $data;
+          return json_encode($data);
         },
         'permission_callback' => '__return_true'
       ));
