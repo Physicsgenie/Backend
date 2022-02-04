@@ -1056,13 +1056,13 @@ class Physics_Genie {
         'callback' => function(){
           $user_id = get_current_user_id();
           $problems = getUserProblems($user_id);
-          $data = (object)[];
+          $data = [];
           foreach($problems as $id => $attempts){
             $problem = getProblem($id);
             $problem -> attempts = $attempts;
-            $data -> $id = $problem;
+            array_push($data, $problem);
           }
-          return json_encode($data);
+          return $data;
         },
         'permission_callback' => '__return_true'
       ));
