@@ -327,6 +327,60 @@ class Physics_Genie {
         ;")[0] -> display_name;
       }
 
+      // Parse the attempts into problems
+      function getUserProblems($id){
+        global $wpdb;
+        $attempts = $wpdb -> get_results("
+          SELECT *
+          FROM ".getTable('pg_user_attempts')."
+          WHERE user_id = ".$id."
+          ORDER BY date_attempted ASC, problem_id
+        ;");
+
+        // Group the attempts into arrays of problems
+        $problems = [];
+        foreach ( $attempts as $attempt ) {
+          $problems[$attempt -> problem_id][] = $attempt;
+        }
+
+        // Sort the problems by the date of the last attempt (ensures completed problems are always in order)
+        uasort($problems, function ($a, $b) {
+          return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
+        });
+
+        return $problems;
+      }
+
+      function getProblem($id){
+          global $wpdb;
+
+          $problem = $wpdb->get_results("
+            SELECT *
+            FROM ".getTable('pg_problems')."
+            WHERE ".getTable('pg_problems').".problem_id = ".$id."
+          ;")[0];
+
+          // Convert other_foci to names
+          $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
+
+          // Convert topic and main_focus to names
+          $problem -> topic = getTopicName( $wpdb -> get_results("
+            SELECT topic
+            FROM ".getTable("pg_foci")."
+            WHERE focus_id = ".($problem -> main_focus)."
+          ;")[0] -> topic );
+          $problem -> main_focus = getFocusName( $problem -> main_focus );
+
+          // Return the problem_errors that match the problem id
+          $problem -> problem_errors = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_problem_errors')."
+            WHERE problem_id = ".$problem -> problem_id."
+          ;");
+          return $problem;
+      }
+
+
       // Time is the minimum time and difficulty is the minimum difficulty
       function getUserStats($id, $time, $min_difficulty, $max_difficulty){
         global $wpdb;
@@ -367,24 +421,7 @@ class Physics_Genie {
           }
         }
 
-        // Get attempts
-        $attempts = $wpdb -> get_results("
-          SELECT *
-          FROM ".getTable('pg_user_attempts')."
-          WHERE user_id = ".$id."
-          ORDER BY date_attempted ASC, problem_id
-        ;");
-
-        // Group the attempts into arrays of problems
-        $problems = [];
-        foreach ( $attempts as $attempt ) {
-          $problems[$attempt -> problem_id][] = $attempt;
-        }
-
-        // Sort the problems by the date of the last attempt (ensures completed problems are always in order)
-        uasort($problems, function ($a, $b) {
-          return end($a) -> user_attempt_id <=> end($b) -> user_attempt_id;
-        });
+        $problems = getUserProblems($id);
 
         // Calculate the minimum date of problems to calculate stats for
         if( $time === 'any' )
@@ -805,32 +842,7 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'problem/(?P<problem>\d+)', array(
         'methods' => 'GET',
         'callback' => function($data) {
-          global $wpdb;
-
-          $problem = $wpdb->get_results("
-            SELECT *
-            FROM ".getTable('pg_problems')."
-            WHERE ".getTable('pg_problems').".problem_id = ".$data['problem']."
-          ;")[0];
-
-          // Convert other_foci to names
-          $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
-
-          // Convert topic and main_focus to names
-          $problem -> topic = getTopicName( $wpdb -> get_results("
-            SELECT topic
-            FROM ".getTable("pg_foci")."
-            WHERE focus_id = ".($problem -> main_focus)."
-          ;")[0] -> topic );
-          $problem -> main_focus = getFocusName( $problem -> main_focus );
-
-          // Return the problem_errors that match the problem id
-          $problem -> problem_errors = $wpdb -> get_results("
-            SELECT *
-            FROM ".getTable('pg_problem_errors')."
-            WHERE problem_id = ".$problem -> problem_id."
-          ;");
-
+          $problem = getProblem($data['problem']);
           return json_encode($problem);
         },
         'permission_callback' => '__return_true'
@@ -1031,6 +1043,30 @@ class Physics_Genie {
         },
         'permission_callback' => '__return_true'
       ));
+
+      /**
+       * @api {get} /user-problems Get user problems
+       * @apiName GetUserProblems
+       * @apiGroup User
+       * @apiDescription Get problems a user has attempted
+       * @apiSuccess {String} Array of problems with a user's attempts
+      */
+      register_rest_route('physics_genie', 'user-problems', array(
+        'methods' => 'GET',
+        'callback' => function(){
+          $user_id = get_current_user_id();
+          $problems = getUserProblems($user_id);
+          $data = (object)[];
+          foreach($problems as $id => $attempts){
+            $problem = getProblem($id);
+            $problem -> attempts = $attempts;
+            $data -> $id = $problem;
+          }
+          return json_encode($data);
+        },
+        'permission_callback' => '__return_true'
+      ));
+
 
       /********* POST REQUESTS *********/
 
@@ -1341,7 +1377,6 @@ class Physics_Genie {
         },
         'permission_callback' => '__return_true'
       ));
-
 
       /**
        * @api {post} /register Register
@@ -1991,9 +2026,9 @@ class Physics_Genie {
 
   // GET REQUESTS
   public function get_user_metadata() {
-    $data = null;
+    $data = (object)[];
 
-    $data->contributor = ((current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor')) ? true : false);
+    $data -> contributor = current_user_can('administrator') || current_user_can('editor') || current_user_can('contributor');
 
     return $data;
   }
@@ -2001,9 +2036,9 @@ class Physics_Genie {
   public function get_user_info() {
     global $wpdb;
 
-    $data = null;
+    $data = (object)[];
 
-    $data->setup = $wpdb->get_results("SELECT curr_diff, curr_topics, curr_foci, calculus FROM pg_users WHERE user_id = ".get_current_user_id().";", OBJECT)[0];
+    $data -> setup = $wpdb->get_results("SELECT curr_diff, curr_topics, curr_foci, calculus FROM pg_users WHERE user_id = ".get_current_user_id().";")[0];
 
 
     return $data;
@@ -2073,11 +2108,11 @@ class Physics_Genie {
 
   public function get_submit_data() {
     global $wpdb;
-    $data = null;
-    $data->topics = $wpdb->get_results("SELECT topic, name FROM pg_topics WHERE focus = 'z';");
-    $data->focuses = $wpdb->get_results("SELECT topic, focus, name FROM pg_topics WHERE topic = 0 AND focus != 'z';");
-    $data->source_categories = $wpdb->get_results("SELECT DISTINCT category FROM pg_sources ORDER BY category;");
-    $data->sources = $wpdb->get_results("SELECT * FROM pg_sources ORDER BY source;");
+    $data = (object)[];
+    $data -> topics = $wpdb -> get_results("SELECT topic, name FROM pg_topics WHERE focus = 'z';");
+    $data -> focuses = $wpdb -> get_results("SELECT topic, focus, name FROM pg_topics WHERE topic = 0 AND focus != 'z';");
+    $data -> source_categories = $wpdb -> get_results("SELECT DISTINCT category FROM pg_sources ORDER BY category;");
+    $data -> sources = $wpdb -> get_results("SELECT * FROM pg_sources ORDER BY source;");
     return $data;
   }
 
