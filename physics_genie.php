@@ -801,6 +801,20 @@ class Physics_Genie {
           // Convert other_foci to names
           $problem -> other_foci = getFocusNames( unserialize( $problem -> other_foci ) );
 
+          $results = $wpdb -> get_results(
+            $wpdb -> prepare("
+              SELECT COUNT(active) AS count
+              FROM " . getTable('pg_user_review') . "
+              WHERE problem_id = %d
+                AND user_id = %d
+                AND active = 1",
+              $problem -> problem_id,
+              get_current_user_id()
+            )
+          );
+
+          $problem -> active = $results[0] -> count > 0;
+
           // Convert topic and main_focus to names
           $problem -> topic = getTopicName( $wpdb -> get_results("
             SELECT topic
@@ -1063,12 +1077,27 @@ class Physics_Genie {
       register_rest_route('physics_genie', 'user-problems', array(
         'methods' => 'GET',
         'callback' => function(){
+          global $wpdb;
           $user_id = get_current_user_id();
           $problems = getUserProblems($user_id);
           $data = [];
           foreach($problems as $id => $attempts){
+            $results = $wpdb -> get_results(
+              $wpdb -> prepare("
+                SELECT COUNT(active) AS count
+                FROM " . getTable('pg_user_review') . "
+                WHERE problem_id = %d
+                  AND user_id = %d
+                  AND active = 1",
+                $id,
+                get_current_user_id()
+              )
+            );
+
             $problem = getProblem($id);
             $problem -> attempts = $attempts;
+            $problem -> active = $results[0] -> count > 0;
+
             array_push($data, $problem);
           }
           return json_encode($data);
