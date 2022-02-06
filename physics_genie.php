@@ -752,16 +752,24 @@ class Physics_Genie {
                 AND difficulty > ".$difficulty."
                 AND difficulty <= ".($difficulty + 2)."
                 AND IF(
-                    (SELECT calculus
+                  (
+                    SELECT calculus
                     FROM wordpress.".getTable('pg_users')."
-                    WHERE user_id = ".get_current_user_id()."), TRUE, calculus != 'Required')
-                AND problem_id NOT IN
-                  (SELECT DISTINCT problem_id
-                   FROM wordpress.".getTable('pg_user_attempts')."
-                   WHERE user_id = ".get_current_user_id().")
+                    WHERE user_id = ".get_current_user_id()."
+                  ), TRUE, calculus != 'Required'
+                )
+                AND problem_id NOT IN(
+                  SELECT DISTINCT problem_id
+                  FROM wordpress.".getTable('pg_user_attempts')."
+                  WHERE user_id = ".get_current_user_id()."
+                  EXCEPT
+                  SELECT DISTINCT problem_id
+                  FROM wordpress.".getTable('pg_user_review')."
+                  WHERE user_id = ".get_current_user_id()."
+                )
               ORDER BY RAND()
               LIMIT 1
-              ;");
+            ;");
 
             if (count($problem) == 0)
               return null;
@@ -1657,6 +1665,37 @@ class Physics_Genie {
         'permission_callback' => '__return_true'
       ));
 
+      /**
+       * @api {post} /review-problem
+       * @apiName ReviewProblem
+       * @apiGroup Submit
+       * @apiDescription Adds problem back into problem pool
+       *
+       * @apiParam {Number} problem_id ID of problem to be reviewed.
+       *
+       * @apiSuccess {Number} data 1 on success.
+      */
+
+      // Add the problem_id and user_id to pg_user_review
+      register_rest_route('physics_genie', 'review-problem', array(
+        'methods' => 'POST',
+        'callback' => function($request_data) {
+          $json = json_decode($request_data -> get_body());
+
+          global $wpdb;
+
+          $wpdb -> insert(getTable('pg_user_review'),
+            array(
+              'problem_id' => intval($json -> problem_id),
+              'user_id' => get_current_user_id()
+            )
+          );
+
+          return 1;
+        },
+        'permission_callback' => '__return_true'
+      ));
+
 
       /**
        * @api {post} /submit-attempt Submit Attempt
@@ -1672,7 +1711,7 @@ class Physics_Genie {
        *
        * @apiSuccess {Number} complete Returns true if the attempt is correct or is the final attempt.
        * @apiSuccess {Boolean} correct Returns true if the attempt is correct
-       */
+      */
       register_rest_route('physics_genie', 'submit-attempt', array(
         'methods' => 'POST',
         'callback' => function($request_data) {
