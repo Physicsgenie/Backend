@@ -813,7 +813,7 @@ class Physics_Genie {
             )
           );
 
-          $problem -> completed = $results[0] -> count > 0;
+          $problem -> active = $results[0] -> count > 0;
 
           // Convert topic and main_focus to names
           $problem -> topic = getTopicName( $wpdb -> get_results("
@@ -1096,7 +1096,7 @@ class Physics_Genie {
 
             $problem = getProblem($id);
             $problem -> attempts = $attempts;
-            $problem -> completed = $results[0] -> count > 0;
+            $problem -> active = $results[0] -> count > 0;
 
             array_push($data, $problem);
           }
