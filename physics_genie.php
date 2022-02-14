@@ -1811,23 +1811,13 @@ class Physics_Genie {
             )
           );
 
-          $wpdb -> update(
-            getTable('pg_users'),
-            array(
-              'curr_problem' => null
-            ),
-            array(
-              'user_id' => get_current_user_id()
-            ),
-            null,
-            array('%d')
-          );
-
           $response = (object)[];
 
           $response -> complete = FALSE;
 
-          if( $json -> correct === TRUE )
+          $response -> correct = $json -> correct;
+
+          if( $response -> correct )
             $response -> complete = TRUE;
 
           $attempts = $wpdb -> get_results("
@@ -1840,7 +1830,20 @@ class Physics_Genie {
           if( $attempts >= 3 )
             $response -> complete = TRUE;
 
-          $response -> correct = $json -> correct;
+          if( $response -> complete ){
+            $wpdb -> update(
+              getTable('pg_users'),
+              array(
+                'curr_problem' => null
+              ),
+              array(
+                'user_id' => get_current_user_id()
+              ),
+              null,
+              array('%d')
+            );
+          }
+
 
           return json_encode($response);
         },
