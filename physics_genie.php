@@ -830,6 +830,15 @@ class Physics_Genie {
             WHERE problem_id = ".$problem -> problem_id."
           ;");
 
+          $attempts = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_user_attempts')."
+            WHERE problem_id = ".$problem -> problem_id."
+              AND user_id = ".get_current_user_id()."
+          ;");
+
+          $problem -> attempts = $attempts;
+
           return json_encode($problem);
         },
         'permission_callback' => '__return_true'
