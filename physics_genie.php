@@ -1804,55 +1804,57 @@ class Physics_Genie {
         'methods' => 'POST',
         'callback' => function($request_data) {
           $json = json_decode($request_data -> get_body());
-          global $wpdb;
+          if(isset($json -> problem_id)){
+            global $wpdb;
 
-          $wpdb -> insert(
-            getTable('pg_user_attempts'),
-            array(
-              'user_id' => get_current_user_id(),
-              'problem_id' => $json -> problem_id,
-              'student_answer' => $json -> student_answer,
-              'correct' => $json -> correct,
-              'give_up' => $json -> give_up,
-              'date_attempted' => date('Y-m-d H:i:s')
-            )
-          );
-
-          $response = (object)[];
-
-          $response -> complete = FALSE;
-
-          $response -> correct = $json -> correct;
-
-          if( $response -> correct )
-            $response -> complete = TRUE;
-
-          $attempts = $wpdb -> get_results("
-            SELECT COUNT(user_attempt_id)
-            FROM wordpress.".getTable('pg_user_attempts')."
-            WHERE user_id = ".get_current_user_id()."
-              AND problem_id = ".$json -> problem_id."
-          ;")[0] -> {'COUNT(user_attempt_id)'};
-
-          if( $attempts >= 3 )
-            $response -> complete = TRUE;
-
-          if( $response -> complete ){
-            $wpdb -> update(
-              getTable('pg_users'),
+            $wpdb -> insert(
+              getTable('pg_user_attempts'),
               array(
-                'curr_problem' => null
-              ),
-              array(
-                'user_id' => get_current_user_id()
-              ),
-              null,
-              array('%d')
+                'user_id' => get_current_user_id(),
+                'problem_id' => $json -> problem_id,
+                'student_answer' => $json -> student_answer,
+                'correct' => $json -> correct,
+                'give_up' => $json -> give_up,
+                'date_attempted' => date('Y-m-d H:i:s')
+              )
             );
-          }
 
+            $response = (object)[];
 
-          return json_encode($response);
+            $response -> complete = FALSE;
+
+            $response -> correct = $json -> correct;
+
+            if( $response -> correct )
+              $response -> complete = TRUE;
+
+            $attempts = $wpdb -> get_results("
+              SELECT COUNT(user_attempt_id)
+              FROM wordpress.".getTable('pg_user_attempts')."
+              WHERE user_id = ".get_current_user_id()."
+                AND problem_id = ".$json -> problem_id."
+            ;")[0] -> {'COUNT(user_attempt_id)'};
+
+            if( $attempts >= 3 )
+              $response -> complete = TRUE;
+
+            if( $response -> complete ){
+              $wpdb -> update(
+                getTable('pg_users'),
+                array(
+                  'curr_problem' => null
+                ),
+                array(
+                  'user_id' => get_current_user_id()
+                ),
+                null,
+                array('%d')
+              );
+            }
+
+            return json_encode($response);
+          } else
+            return 1;
         },
         'permission_callback' => '__return_true'
 
