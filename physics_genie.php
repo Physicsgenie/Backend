@@ -227,8 +227,6 @@ class Physics_Genie {
         $focus_names = [];
         foreach( $ids as $id )
           array_push($focus_names, getFocusName($id));
-        if( $focus_names = [null] )
-          $focus_names = [];
         return $focus_names;
       }
 
@@ -1003,6 +1001,8 @@ class Physics_Genie {
             FROM ".getTable('pg_users')." 
             WHERE user_id = ".get_current_user_id()."
           ;")[0];
+
+          var_dump(unserialize($data -> setup -> curr_foci));
 
           // Convert curr_topics to names
           $data -> setup -> curr_topics = getTopicNames( unserialize( $data -> setup -> curr_topics ) );
