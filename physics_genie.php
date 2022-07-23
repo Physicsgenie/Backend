@@ -227,8 +227,6 @@ class Physics_Genie {
         $focus_names = [];
         foreach( $ids as $id )
           array_push($focus_names, getFocusName($id));
-        if( $focus_names = [null] )
-          $focus_names = [];
         return $focus_names;
       }
 
@@ -830,6 +828,15 @@ class Physics_Genie {
             WHERE problem_id = ".$problem -> problem_id."
           ;");
 
+          $attempts = $wpdb -> get_results("
+            SELECT *
+            FROM ".getTable('pg_user_attempts')."
+            WHERE problem_id = ".$problem -> problem_id."
+              AND user_id = ".get_current_user_id()."
+          ;");
+
+          $problem -> attempts = $attempts;
+
           return json_encode($problem);
         },
         'permission_callback' => '__return_true'
@@ -994,6 +1001,8 @@ class Physics_Genie {
             FROM ".getTable('pg_users')." 
             WHERE user_id = ".get_current_user_id()."
           ;")[0];
+
+          var_dump(unserialize($data -> setup -> curr_foci));
 
           // Convert curr_topics to names
           $data -> setup -> curr_topics = getTopicNames( unserialize( $data -> setup -> curr_topics ) );
