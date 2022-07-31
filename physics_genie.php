@@ -734,7 +734,14 @@ class Physics_Genie {
               WHERE user_id = ".get_current_user_id()."
             ;")[0] -> curr_foci;
 
+            $topics = $wpdb -> get_results("
+              SELECT curr_topics
+              FROM wordpress.".getTable('pg_users')."
+              WHERE user_id = ".get_current_user_id()."
+            ;")[0] -> curr_topics;
+
             $fociCond = implode(', ', unserialize($foci));
+            $topicsCond = implode(', ', unserialize($topics));
 
             $difficulty = $wpdb -> get_results("
               SELECT curr_diff
@@ -742,11 +749,13 @@ class Physics_Genie {
               WHERE user_id = ".get_current_user_id()."
             ;")[0] -> curr_diff;
 
+            // Limit problem selection to mechanics for the time being
             $problem = $wpdb -> get_results("
               SELECT *
               FROM wordpress.".getTable('pg_problems')."
               WHERE
                 main_focus IN (".$fociCond.")
+                AND topic IN (".$topicsCond.")
                 AND difficulty > ".$difficulty."
                 AND difficulty <= ".($difficulty + 2)."
                 AND IF(
@@ -1658,6 +1667,7 @@ class Physics_Genie {
               'submitter' => get_current_user_id(),
               'difficulty' => intval($json -> difficulty),
               'calculus' => $json -> calculus,
+              'topic' => getTopicId($json -> topic),
               'main_focus' => getFocusId($json -> main_focus),
               'other_foci' => $other_foci,
               'date_added' => date('Y-m-d')
