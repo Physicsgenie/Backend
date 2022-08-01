@@ -769,6 +769,7 @@ class Physics_Genie {
                   SELECT DISTINCT problem_id
                   FROM wordpress.".getTable('pg_user_attempts')."
                   WHERE user_id = ".get_current_user_id()."
+                  AND problem_id IS NOT NULL
                   EXCEPT
                   SELECT DISTINCT problem_id
                   FROM wordpress.".getTable('pg_user_review')."
