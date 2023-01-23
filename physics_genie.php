@@ -4,6 +4,11 @@
 Plugin Name: physics_genie
  */
 
+
+function add_cors_http_header(){
+  header("Access-Control-Allow-Origin: *");
+}
+
 // Change the wordpress login logo
 function change_logo() { ?>
   <style type="text/css">
@@ -26,6 +31,7 @@ add_filter( 'login_url', function() { return 'https://app.physicsgenie.ga/login'
 add_filter( 'register_url', function() { return 'https://app.physicsgenie.ga/register'; });
 add_filter( 'lostpassword_url', function() { return 'https://app.physicsgenie.ga/password-reset'; });
 add_action( 'login_enqueue_scripts', 'change_logo' );
+add_action( 'init', 'add_cors_http_header' );
 
 // Reads the debug config from config.php
 require_once('config.php');
