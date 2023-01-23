@@ -6,14 +6,15 @@ Plugin Name: physics_genie
 
 
 function add_cors_http_header(){
-  header("Access-Control-Allow-Origin: *");
+  header("Access-Control-Allow-Origin: https://app.physicsgenie.org");
+  header("Access-Control-Allow-Credentials: true");
 }
 
 // Change the wordpress login logo
 function change_logo() { ?>
   <style type="text/css">
     #login h1 a, .login h1 a {
-      background-image: url("https://physicsgenie.ga/wp-content/uploads/2021/03/Logo.png");
+      background-image: url("https://physicsgenie.org/wp-content/uploads/2021/03/Logo.png");
       height: 80px;
       width: 112px;
       background-size: 112px 80px;
@@ -27,9 +28,9 @@ function change_logo() { ?>
 add_filter( 'login_redirect', function() { return home_url(); });
 add_filter( 'login_headertitle', function() { return 'Physicsgenie'; } );
 add_filter( 'login_headerurl', function() { return home_url(); } );
-add_filter( 'login_url', function() { return 'https://app.physicsgenie.ga/login'; });
-add_filter( 'register_url', function() { return 'https://app.physicsgenie.ga/register'; });
-add_filter( 'lostpassword_url', function() { return 'https://app.physicsgenie.ga/password-reset'; });
+add_filter( 'login_url', function() { return 'https://app.physicsgenie.org/login'; });
+add_filter( 'register_url', function() { return 'https://app.physicsgenie.org/register'; });
+add_filter( 'lostpassword_url', function() { return 'https://app.physicsgenie.org/password-reset'; });
 add_action( 'login_enqueue_scripts', 'change_logo' );
 add_action( 'init', 'add_cors_http_header' );
 
@@ -1582,7 +1583,7 @@ class Physics_Genie {
           wp_mail(
             $submitter_email,
             "[Physics Genie] Problem Error Reported",
-            "We have recieved an error report for one of your problems.\nPlease visit https://app.physicsgenie.ga/submit-portal/" . $json -> problem_id . " to resolve the issue.\n\n" .
+            "We have recieved an error report for one of your problems.\nPlease visit https://app.physicsgenie.org/submit-portal/" . $json -> problem_id . " to resolve the issue.\n\n" .
             "Details:\n" .
             "User: " . $user_name . "\n" .
             "Problem ID: " . $json -> problem_id . "\n" .
