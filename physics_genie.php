@@ -4,10 +4,6 @@
 Plugin Name: physics_genie
  */
 
-function add_cors_http_header(){
-  header("Access-Control-Allow-Origin: *");
-}
-
 // Change the wordpress login logo
 function change_logo() { ?>
   <style type="text/css">
@@ -30,7 +26,6 @@ add_filter( 'login_url', function() { return 'https://app.physicsgenie.ga/login'
 add_filter( 'register_url', function() { return 'https://app.physicsgenie.ga/register'; });
 add_filter( 'lostpassword_url', function() { return 'https://app.physicsgenie.ga/password-reset'; });
 add_action( 'login_enqueue_scripts', 'change_logo' );
-add_action( 'init', 'add_cors_http_header' );
 
 // Reads the debug config from config.php
 require_once('config.php');
@@ -423,11 +418,13 @@ class Physics_Genie {
 
         // Calculate the minimum date of problems to calculate stats for
         if( $time === 'any' )
-          $min_date = date_create("1970-01-01");
+          $min_date = date_create("1970-01-01") -> format('Y-m-d H:i:s');
         else if ( $time === 'week' )
           $min_date = date_create(date('Y-m-d H:i:s')) -> modify('-7 days') -> format('Y-m-d H:i:s');
         else if ( $time === 'month' )
           $min_date = date_create(date('Y-m-d H:i:s')) -> modify('-30 days') -> format('Y-m-d H:i:s');
+        else
+          $min_date = date_create("1970-01-01") -> format('Y-m-d H:i:s');
 
         // Loop through and calculate stats
         foreach ( $problems as $problem_id => $problem  ) {
@@ -1058,12 +1055,14 @@ class Physics_Genie {
 
             // Loop through each focus in the topic
             foreach ( $topic_stat['focus_stats'] as $focus_id => $focus_stat ){
-              // Set the focus name
-              $focus_name = getFocusName($focus_id);
-              $focus_stat['focus'] = $focus_name;
-              // Invert losestreak so the result is positive
-              $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
-              array_push($focus_stats, $focus_stat);
+              if(is_int($focus_id)){
+                // Set the focus name
+                $focus_name = getFocusName($focus_id);
+                $focus_stat['focus'] = $focus_name;
+                // Invert losestreak so the result is positive
+                $focus_stat['longest_losestreak'] = - $focus_stat['longest_losestreak'];
+                array_push($focus_stats, $focus_stat);
+              }
             }
 
             // Add the focus stats for the topic
