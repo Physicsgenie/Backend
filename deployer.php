@@ -77,7 +77,7 @@ if ($json["ref"] === BRANCH) {
         }
 
         /**
-         * Attempt to pull, returing the output and exit code
+         * Attempt to pull, returning the output and exit code
          */
         exec(GIT . " pull 2>&1", $output, $exit);
 
@@ -147,7 +147,7 @@ if ($json["ref"] === BRANCH) {
         // prepare the generic error
         $error = "=== ERROR: DIR `" . DIR . "` is not a repository ===\n";
 
-        // try to detemrine the real error
+        // try to determine the real error
         if (!file_exists(DIR)) {
             $error = "=== ERROR: DIR `" . DIR . "` does not exist ===\n";
         } elseif (!is_dir(DIR)) {

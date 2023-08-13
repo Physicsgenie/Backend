@@ -708,8 +708,8 @@ class Physics_Genie {
        * @apiSuccess {String} must_match Whether or not the student's answer must match the correct answer exactly in form ("1" if it must match, "0" otherwise).
        * @apiSuccess {String} solution Solution of problem (LaTeX).
        * @apiSuccess {String} solution_diagram Solution diagram of problem (svg). null if no solution diagram.
-       * @apiSuccess {String} hint_one First hint of problem (LaTeX).
-       * @apiSuccess {String} hint_two Second hint of problem (LaTeX). null , 'curr_foci'if no second hint.
+       * @apiSuccess {String} hint_one First hint of problem (LaTeX). null if no first hint.
+       * @apiSuccess {String} hint_two Second hint of problem (LaTeX). null if no second hint.
        * @apiSuccess {String} source Id of the source of the problem.
        * @apiSuccess {String} number_in_source Number of problem within the source.
        * @apiSuccess {String} submitter User id of the person who submitted the problem.
@@ -718,6 +718,8 @@ class Physics_Genie {
        * @apiSuccess {String} topic Character id of topic of problem.
        * @apiSuccess {String} main_focus Character id of primary focus of problem.
        * @apiSuccess {String} other_foci Array of focus_ids corresponding to each focus.
+       * @apiSuccess {String} problem_type Type of problem ("sa" for Short Answer, "mc" for Multiple Choice, or "ms" for Multiple Select).
+       * @apiSuccess {String} resources Resources to learn more about the problem and solution.
        * @apiSuccess {String} date_added Date problem was submitted.
        */
       register_rest_route('physics_genie', 'problem', array(
@@ -871,7 +873,7 @@ class Physics_Genie {
        * @apiSuccess {String} must_match Whether or not the student's answer must match the correct answer exactly in form ("1" if it must match, "0" otherwise).
        * @apiSuccess {String} solution Solution of problem (LaTeX).
        * @apiSuccess {String} solution_diagram Solution diagram of problem (svg). null if no solution diagram.
-       * @apiSuccess {String} hint_one First hint of problem (LaTeX).
+       * @apiSuccess {String} hint_one First hint of problem (LaTeX). null if no first hint.
        * @apiSuccess {String} hint_two Second hint of problem (LaTeX). null if no second hint.
        * @apiSuccess {String} source Id of the source of the problem.
        * @apiSuccess {String} number_in_source Number of problem within the source.
@@ -881,6 +883,8 @@ class Physics_Genie {
        * @apiSuccess {String} topic Character id of topic of problem.
        * @apiSuccess {String} main_focus Character id of primary focus of problem.
        * @apiSuccess {String} other_foci Array of focus_ids corresponding to each focus.
+       * @apiSuccess {String} problem_type Type of problem ("sa" for Short Answer, "mc" for Multiple Choice, or "ms" for Multiple Select).
+       * @apiSuccess {String} resources Resources to learn more about the problem and solution.
        * @apiSuccess {String} date_added Date problem was submitted.
        */
       register_rest_route('physics_genie', 'problem/(?P<problem>\d+)', array(
@@ -915,7 +919,7 @@ class Physics_Genie {
             ORDER BY problem_id DESC
           ;");
 
-          if (get_current_user_id() === 1 || get_current_user_id() === 6 || get_current_user_id() === 16) {
+          if (get_current_user_id() === 1 || get_current_user_id() === 6 || get_current_user_id() === 17) {
             $problems = $wpdb -> get_results("
               SELECT *
               FROM ".getTable('pg_problems')."
@@ -1633,7 +1637,7 @@ class Physics_Genie {
        * @apiParam {String} must_match Whether or not the student's answer must match the correct answer exactly in form ("true" if it must match, "false" otherwise).
        * @apiParam {String} solution Solution of problem (LaTeX).
        * @apiParam {String} solution_diagram Solution diagram of problem (svg). Empty string if no solution diagram.
-       * @apiParam {String} hint_one First hint of problem (LaTeX).
+       * @apiParam {String} hint_one First hint of problem (LaTeX). Empty string if no first hint.
        * @apiParam {String} hint_two Second hint of problem (LaTeX). Empty string if no second hint.
        * @apiParam {String} source Id of the source of the problem.
        * @apiParam {String} number_in_source Number of problem within the source.
@@ -1642,6 +1646,8 @@ class Physics_Genie {
        * @apiParam {String} topic Character id of topic of problem.
        * @apiParam {String} main_focus Character id of primary focus of problem.
        * @apiParam {String} other_foci Array of focus_ids. Empty string if no other foci.
+       * @apiParam {String} problem_type Type of problem ("sa" for Short Answer, "mc" for Multiple Choice, or "ms" for Multiple Select).
+       * @apiParam {String} resources Resources to learn more about the problem and solution.
        *
        * @apiSuccess {Number} data Id of new problem in problem database on success.
        */
@@ -1677,6 +1683,8 @@ class Physics_Genie {
               'topic' => getTopicId($json -> topic),
               'main_focus' => getFocusId($json -> main_focus),
               'other_foci' => $other_foci,
+              'problem_type' => $json -> problem_type,
+              'resources' => $json -> resources,
               'date_added' => date('Y-m-d')
             )
           );
@@ -1813,6 +1821,7 @@ class Physics_Genie {
        * @apiParam {String} problem_id Id of attempted problem.
        * @apiParam {String} student_answer The student's answer for the attempt
        * @apiParam {String} correct Whether or not the problem was correct ("true" if correct, "false" otherwise).
+       * @apiParam {String} give_up Whether or not the problem was given up ("true" if given up, "false" otherwise).
        *
        * @apiSuccess {Number} complete Returns true if the attempt is correct or is the final attempt.
        * @apiSuccess {Boolean} correct Returns true if the attempt is correct
@@ -2024,7 +2033,7 @@ class Physics_Genie {
        * @apiParam {String} must_match Whether or not the student's answer must match the correct answer exactly in form ("true" if it must match, "false" otherwise).
        * @apiParam {String} solution Solution of problem (LaTeX).
        * @apiParam {String} solution_diagram Solution diagram of problem (svg). Empty string if no solution diagram.
-       * @apiParam {String} hint_one First hint of problem (LaTeX).
+       * @apiParam {String} hint_one First hint of problem (LaTeX). Empty string if no first hint.
        * @apiParam {String} hint_two Second hint of problem (LaTeX). Empty string if no second hint.
        * @apiParam {String} source Id of the source of the problem.
        * @apiParam {String} number_in_source Number of problem within the source.
@@ -2033,6 +2042,8 @@ class Physics_Genie {
        * @apiParam {String} topic Character id of topic of problem.
        * @apiParam {String} main_focus Character id of primary focus of problem.
        * @apiParam {String} other_foci Array of focus_ids. Empty string if no other foci.
+       * @apiParam {String} problem_type Type of problem ("sa" for Short Answer, "mc" for Multiple Choice, or "ms" for Multiple Select).
+       * @apiParam {String} resources Resources to learn more about the problem and solution.
        * @apiParam {String} errors_addressed Array of problem_error_ids.
        *
        * @apiSuccess {Number} data Returns 1 on success.
@@ -2119,6 +2130,8 @@ class Physics_Genie {
               'calculus' => $json -> calculus,
               'main_focus' => getFocusId($json -> main_focus),
               'other_foci' => $other_foci,
+              'problem_type' => $json -> problem_type,
+              'resources' => $json -> resources,
               'date_added' => date('Y-m-d')
             ),
             array(

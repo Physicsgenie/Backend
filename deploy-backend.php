@@ -5,7 +5,7 @@ require('config.php'); // No peeking
 define('TOKEN', $TOKEN); // Secrets
 
 define('REMOTE_REPOSITORY', 'git@github.com:Physicsgenie/Backend.git'); // The SSH URL to your repository
-define('DIR', '/var/www/physicsgenie/wp-content/plugins/physics_genie/');      // The path to your repostiory; this must begin with a forward slash (/)
+define('DIR', '/var/www/physicsgenie/wp-content/plugins/physics_genie/');      // The path to your repository; this must begin with a forward slash (/)
 define('BRANCH', 'refs/heads/master');                                 // The branch route
 define('LOGFILE', 'deploy.log');                                       // The name of the file you want to log to.
 define('GIT', '/usr/bin/git');                                         // The path to the git executable
