@@ -1851,7 +1851,7 @@ class Physics_Genie {
 
             $response -> correct = $json -> correct;
 
-            if( $response -> correct )
+            if( $response -> correct or $json -> give_up)
               $response -> complete = TRUE;
 
             $attempts = $wpdb -> get_results("
