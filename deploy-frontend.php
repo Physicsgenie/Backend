@@ -11,6 +11,6 @@ define('LOGFILE', 'deploy.log');                                       // The na
 define('GIT', '/usr/bin/git');                                         // The path to the git executable
 define('MAX_EXECUTION_TIME', 600);                                     // Override for PHP's max_execution_time (may need set in php.ini)
 define('BEFORE_PULL', '/usr/bin/git fetch && /usr/bin/git reset --hard @{u}');               // A command to execute before pulling
-define('AFTER_PULL', 'export PATH="/home/pg/Frontend/node_modules/bin:$PATH" && npm run build');                                              // A command to execute after successfully pulling
+define('AFTER_PULL', 'export PATH="/home/pg/Frontend/node_modules/bin:$PATH" && npm install && npm run build');                                              // A command to execute after successfully pulling
 
 require_once('deployer.php');
